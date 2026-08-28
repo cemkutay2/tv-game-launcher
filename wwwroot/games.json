@@ -1,0 +1,20 @@
+[
+  {
+    "id": "demo1",
+    "title": "Neon Grid",
+    "thumbnail": "games/demo1/thumb.png",
+    "script": "games/demo1/game.js"
+  },
+  {
+    "id": "demo2",
+    "title": "Bouncing Ball",
+    "thumbnail": "games/demo2/thumb.png",
+    "script": "games/demo2/game.js"
+  },
+  {
+    "id": "falling-blocks",
+    "title": "Falling Blocks",
+    "thumbnail": "games/falling-blocks/thumb.png",
+    "script": "games/falling-blocks/game.js"
+  }
+]

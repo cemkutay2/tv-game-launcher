@@ -1,0 +1,96 @@
+@page "/"
+@using System.Text.Json
+@inject IJSRuntime JSRuntime
+
+<div class="launcher-container" style="display: @(isPlaying ? "none" : "flex")">
+    <div class="header">
+        <h1>Phaser Game Library</h1>
+        <p>Select a game to play</p>
+    </div>
+
+    <div class="game-grid">
+        @if (games == null)
+        {
+            <p>Loading games...</p>
+        }
+        else
+        {
+            @foreach (var game in games)
+            {
+                <div tabindex="0" class="game-card" @onclick="() => LaunchGame(game.Script)">
+                    <div class="game-thumb">
+                        @if (!string.IsNullOrEmpty(game.Thumbnail))
+                        {
+                            <img src="@game.Thumbnail" class="game-thumb-img" alt="@game.Title" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                            <div class="thumb-placeholder" style="display: none;">@game.Title</div>
+                        }
+                        else
+                        {
+                            <div class="thumb-placeholder">@game.Title</div>
+                        }
+                    </div>
+                    <h2>@game.Title</h2>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<div id="game-container" style="display: @(isPlaying ? "block" : "none"); width: 100vw; height: 100vh; overflow: hidden; background-color: #000; position: absolute; top: 0; left: 0;">
+</div>
+
+@code {
+    private List<GameEntry> games;
+    private bool isPlaying = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        MainPage.BackButtonPressed = () =>
+        {
+            if (isPlaying)
+            {
+                InvokeAsync(ExitGame);
+                return true; // We handled it, don't exit the app
+            }
+            return false; // Let the app exit
+        };
+
+        // Fetch games.json via JS since HttpClient isn't registered by default in MAUI Blazor
+        var json = await JSRuntime.InvokeAsync<string>("eval", "fetch('games.json').then(r => r.text())");
+        games = JsonSerializer.Deserialize<List<GameEntry>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+    }
+
+    private async Task LaunchGame(string scriptPath)
+    {
+        isPlaying = true;
+        StateHasChanged();
+        
+        // Wait for render to display the game-container
+        await Task.Delay(50);
+        
+        try 
+        {
+            await JSRuntime.InvokeVoidAsync("appLauncher.loadGame", scriptPath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error launching game: {ex.Message}");
+            await ExitGame();
+        }
+    }
+
+    private async Task ExitGame()
+    {
+        await JSRuntime.InvokeVoidAsync("appLauncher.exitGame");
+        isPlaying = false;
+        StateHasChanged();
+    }
+
+    public class GameEntry
+    {
+        public string Id { get; set; }
+        public string Title { get; set; }
+        public string Thumbnail { get; set; }
+        public string Script { get; set; }
+    }
+}
