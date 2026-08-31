@@ -16,5 +16,11 @@
     "title": "Falling Blocks",
     "thumbnail": "games/falling-blocks/thumb.png",
     "script": "games/falling-blocks/game.js"
+  },
+  {
+    "id": "blackjack",
+    "title": "Neon Blackjack",
+    "thumbnail": "games/blackjack/thumb.png",
+    "script": "games/blackjack/game.js"
   }
 ]
