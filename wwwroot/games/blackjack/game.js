@@ -256,10 +256,85 @@ window.launchGame = function(containerId) {
             this.selectedOptionIndex = 0;
             this.menuItems = [];
 
+            this.createConfirmUI();
+
             this.input.keyboard.on('keydown', this.handleInput, this);
             
             this.createDeck();
             this.startBetting();
+        }
+
+        createConfirmUI() {
+            this.confirmContainer = this.add.container(960, 540).setDepth(100).setVisible(false);
+                
+            const bg = this.add.graphics();
+            bg.fillStyle(0x0a192f, 0.95);
+            bg.fillRoundedRect(-400, -180, 800, 360, 20);
+            bg.lineStyle(4, 0x64ffda, 1);
+            bg.strokeRoundedRect(-400, -180, 800, 360, 20);
+            
+            const title = this.add.text(0, -90, 'ARE YOU SURE?', {
+                fontFamily: 'sans-serif', fontSize: '48px', color: '#ff6b6b', fontStyle: 'bold'
+            }).setOrigin(0.5);
+            
+            const warning = this.add.text(0, -10, 'Your run will end and your bankroll\nwill be reset to $1000.', {
+                fontFamily: 'sans-serif', fontSize: '28px', color: '#ccd6f6', align: 'center', lineSpacing: 10
+            }).setOrigin(0.5);
+            
+            this.confirmContainer.add([bg, title, warning]);
+            
+            this.confirmOptions = ['YES (EXIT)', 'NO (CANCEL)'];
+            this.confirmIndex = 1;
+            this.confirmMenuItems = [];
+            
+            this.confirmOptions.forEach((opt, idx) => {
+                const item = this.add.container((idx === 0 ? -180 : 180), 90);
+                const btnBg = this.add.graphics();
+                const txt = this.add.text(0, 0, opt, {
+                    fontFamily: 'sans-serif', fontSize: '28px', color: '#ffffff', fontStyle: 'bold'
+                }).setOrigin(0.5);
+                item.add([btnBg, txt]);
+                item.bg = btnBg;
+                item.txt = txt;
+                this.confirmMenuItems.push(item);
+                this.confirmContainer.add(item);
+            });
+        }
+        
+        drawConfirmMenu() {
+            const btnW = 260;
+            const btnH = 70;
+            const radius = 35;
+            
+            this.confirmMenuItems.forEach((item, index) => {
+                item.bg.clear();
+                if (index === this.confirmIndex) {
+                    item.bg.fillStyle(0x64ffda, 0.2);
+                    item.bg.fillRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
+                    item.bg.lineStyle(4, 0x64ffda, 1);
+                    item.bg.strokeRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
+                    item.txt.setColor('#64ffda');
+                    item.txt.setShadow(0, 0, '#64ffda', 10, false, true);
+                    item.setScale(1.1);
+                } else {
+                    item.bg.fillStyle(0x112240, 0.8);
+                    item.bg.fillRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
+                    item.bg.lineStyle(2, 0x233554, 1);
+                    item.bg.strokeRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
+                    item.txt.setColor('#8892b0');
+                    item.txt.setShadow(0,0,'#000',0,false,false);
+                    item.setScale(1.0);
+                }
+            });
+        }
+        
+        promptExit() {
+            if (this.gameState === 'CONFIRM_EXIT') return;
+            this.previousState = this.gameState;
+            this.gameState = 'CONFIRM_EXIT';
+            this.confirmContainer.setVisible(true);
+            this.confirmIndex = 1;
+            this.drawConfirmMenu();
         }
 
         createDeck() {
@@ -622,9 +697,27 @@ window.launchGame = function(containerId) {
             const key = event.keyCode;
             const K = Phaser.Input.Keyboard.KeyCodes;
             
+            if (this.gameState === 'CONFIRM_EXIT') {
+                if (key === K.LEFT || key === K.RIGHT) {
+                    this.confirmIndex = this.confirmIndex === 0 ? 1 : 0;
+                    this.drawConfirmMenu();
+                } else if (key === K.ENTER || key === K.SPACE) {
+                    if (this.confirmIndex === 0) {
+                        this.scene.start('MenuScene');
+                    } else {
+                        this.gameState = this.previousState;
+                        this.confirmContainer.setVisible(false);
+                    }
+                } else if (key === K.ESC) {
+                    this.gameState = this.previousState;
+                    this.confirmContainer.setVisible(false);
+                }
+                return;
+            }
+
             // Allow backing out via ESC or BACK remote button anywhere
             if (key === K.ESC) {
-                this.scene.start('MenuScene');
+                this.promptExit();
                 return;
             }
 
@@ -647,7 +740,7 @@ window.launchGame = function(containerId) {
             const opt = this.options[this.selectedOptionIndex];
             
             if (opt === 'MENU') {
-                this.scene.start('MenuScene');
+                this.promptExit();
             } else if (opt === 'RESTART') {
                 this.bankroll = 1000;
                 this.currentBet = 0;
