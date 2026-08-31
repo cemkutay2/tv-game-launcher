@@ -36,32 +36,46 @@ window.launchGame = function(containerId) {
             this.deck = [];
             this.playerHand = [];
             this.dealerHand = [];
-            this.gameState = 'IDLE';
+            this.gameState = 'IDLE'; 
+            
+            // Financials
+            this.bankroll = 1000;
+            this.currentBet = 0;
 
             // UI Elements
             this.add.text(960, 80, 'NEON BLACKJACK', {
-                fontFamily: 'sans-serif',
-                fontSize: '64px',
-                color: '#64ffda',
-                fontStyle: 'bold'
+                fontFamily: 'sans-serif', fontSize: '64px', color: '#64ffda', fontStyle: 'bold'
             }).setOrigin(0.5).setShadow(0, 0, '#64ffda', 10, false, true);
 
-            this.dealerScoreText = this.add.text(960, 160, '', {
+            this.bankrollText = this.add.text(1800, 70, `BANK: $${this.bankroll}`, {
+                fontFamily: 'monospace', fontSize: '42px', color: '#64ffda', fontStyle: 'bold'
+            }).setOrigin(1, 0.5).setShadow(0, 0, '#64ffda', 10, false, true);
+
+            this.highScore = parseInt(localStorage.getItem('blackjack_highscore')) || 1000;
+            this.highScoreText = this.add.text(1800, 120, `TOP: $${this.highScore}`, {
+                fontFamily: 'monospace', fontSize: '28px', color: '#ffb86c', fontStyle: 'bold'
+            }).setOrigin(1, 0.5).setShadow(0, 0, '#ffb86c', 10, false, true);
+
+            this.betText = this.add.text(960, 580, '', {
+                fontFamily: 'monospace', fontSize: '42px', color: '#ffd700', fontStyle: 'bold'
+            }).setOrigin(0.5).setShadow(0, 0, '#ffd700', 10, false, true);
+
+            this.dealerScoreText = this.add.text(960, 140, '', {
                 fontFamily: 'sans-serif', fontSize: '28px', color: '#8892b0'
             }).setOrigin(0.5);
 
-            this.playerScoreText = this.add.text(960, 840, '', {
+            this.playerScoreText = this.add.text(960, 890, '', {
                 fontFamily: 'sans-serif', fontSize: '28px', color: '#8892b0'
             }).setOrigin(0.5);
 
-            this.statusText = this.add.text(960, 500, '', {
-                fontFamily: 'sans-serif', fontSize: '64px', color: '#ccd6f6', fontStyle: 'bold'
+            this.statusText = this.add.text(960, 480, '', {
+                fontFamily: 'sans-serif', fontSize: '64px', color: '#ccd6f6', fontStyle: 'bold', align: 'center'
             }).setOrigin(0.5).setShadow(0, 0, '#64ffda', 10, false, true);
 
             // Containers
-            this.dealerContainer = this.add.container(960, 300);
-            this.playerContainer = this.add.container(960, 700);
-            this.menuContainer = this.add.container(960, 950);
+            this.dealerContainer = this.add.container(960, 280);
+            this.playerContainer = this.add.container(960, 750);
+            this.menuContainer = this.add.container(960, 980);
 
             // Menu state
             this.options = [];
@@ -71,7 +85,8 @@ window.launchGame = function(containerId) {
             // Input
             this.input.keyboard.on('keydown', this.handleInput, this);
 
-            this.resetGame();
+            this.createDeck();
+            this.startBetting();
         }
 
         createBackgroundTexture() {
@@ -193,16 +208,51 @@ window.launchGame = function(containerId) {
             Phaser.Utils.Array.Shuffle(this.deck);
         }
 
-        resetGame() {
-            this.createDeck();
+        startBetting() {
+            this.gameState = 'BETTING';
             this.playerHand = [];
             this.dealerHand = [];
             this.dealerContainer.removeAll(true);
             this.playerContainer.removeAll(true);
-            this.gameState = 'IDLE';
-            this.statusText.setText('Welcome to Neon Blackjack');
+            
+            // Revert bet if bankroll is too low
+            if (this.currentBet > this.bankroll) {
+                this.currentBet = this.bankroll;
+            }
+            if (this.currentBet === 0 && this.bankroll > 0) {
+                this.currentBet = Math.min(10, this.bankroll);
+            }
+            
+            if (this.bankroll === 0 && this.currentBet === 0) {
+                this.statusText.setText('BANKRUPT!\nPress ENTER to Restart');
+                this.betText.setText('');
+                this.updateScores();
+                this.updateMenu(['RESTART']);
+                return;
+            }
+
+            this.statusText.setText('PLACE YOUR BET');
             this.updateScores();
-            this.updateMenu(['DEAL']);
+            this.updateFinancials();
+            this.updateMenu(['+ $10', '+ $50', 'CLEAR', 'ALL IN', 'DEAL']);
+        }
+        
+        updateFinancials() {
+            this.bankrollText.setText(`BANK: $${this.bankroll}`);
+            
+            if (this.bankroll > this.highScore) {
+                this.highScore = this.bankroll;
+                localStorage.setItem('blackjack_highscore', this.highScore);
+                this.highScoreText.setText(`TOP: $${this.highScore}`);
+            }
+
+            if (this.gameState === 'BETTING') {
+                this.betText.setText(`CURRENT BET: $${this.currentBet}`);
+            } else if (this.currentBet > 0) {
+                this.betText.setText(`BET: $${this.currentBet}`);
+            } else {
+                this.betText.setText('');
+            }
         }
 
         dealInitial() {
@@ -256,14 +306,10 @@ window.launchGame = function(containerId) {
 
         createCardSprite(cardData, hidden) {
             const card = this.add.container(0, 0);
-            
-            // Background is at 0,0, but its visual center is offset due to 170x230 size + drop shadow 
-            // The texture is 170x230, so its origin is 85, 115.
             const bg = this.add.sprite(0, 0, hidden ? 'card_back' : 'card');
             card.add(bg);
             
             if (!hidden) {
-                // Offset text to fit the 150x210 usable area
                 const textTop = this.add.text(-50, -80, cardData.value + '\n' + cardData.suit, {
                     fontFamily: 'sans-serif', fontSize: '24px', color: cardData.color, align: 'center', lineSpacing: -5
                 }).setOrigin(0.5, 0.5);
@@ -350,7 +396,6 @@ window.launchGame = function(containerId) {
         checkBlackjack() {
             const pScore = this.calculateScore(this.playerHand);
             
-            // Check dealer blackjack by looking at actual cards
             let trueDealerScore = 0;
             let dealerAces = 0;
             for (let c of this.dealerHand) {
@@ -365,14 +410,14 @@ window.launchGame = function(containerId) {
             if (pScore === 21) {
                 this.revealDealer(() => {
                     if (trueDealerScore === 21) {
-                        this.endGame('PUSH - BOTH BLACKJACK!');
+                        this.endGame('PUSH - BOTH BLACKJACK!', 'PUSH');
                     } else {
-                        this.endGame('BLACKJACK! YOU WIN!');
+                        this.endGame('BLACKJACK!', 'BLACKJACK');
                     }
                 });
             } else if (trueDealerScore === 21) {
                 this.revealDealer(() => {
-                    this.endGame('DEALER BLACKJACK!');
+                    this.endGame('DEALER BLACKJACK!', 'LOSE');
                 });
             } else {
                 this.gameState = 'PLAYER_TURN';
@@ -388,7 +433,7 @@ window.launchGame = function(containerId) {
             this.drawCard(this.playerHand, this.playerContainer, false, () => {
                 const score = this.calculateScore(this.playerHand);
                 if (score > 21) {
-                    this.endGame('BUST! YOU LOSE!');
+                    this.endGame('BUST! YOU LOSE!', 'LOSE');
                 } else {
                     this.gameState = 'PLAYER_TURN';
                     this.updateMenu(['HIT', 'STAND']);
@@ -464,23 +509,40 @@ window.launchGame = function(containerId) {
             const dScore = this.calculateScore(this.dealerHand);
             
             if (dScore > 21) {
-                this.endGame('DEALER BUSTS! YOU WIN!');
+                this.endGame('DEALER BUSTS!', 'WIN');
             } else if (pScore > dScore) {
-                this.endGame('YOU WIN!');
+                this.endGame('YOU WIN!', 'WIN');
             } else if (dScore > pScore) {
-                this.endGame('DEALER WINS!');
+                this.endGame('DEALER WINS!', 'LOSE');
             } else {
-                this.endGame('PUSH (TIE)');
+                this.endGame('PUSH (TIE)', 'PUSH');
             }
         }
 
-        endGame(message) {
+        endGame(message, outcome) {
             this.gameState = 'GAME_OVER';
+            
+            if (outcome === 'WIN') {
+                this.bankroll += this.currentBet * 2;
+                message += `\n+$${this.currentBet}`; 
+            } else if (outcome === 'BLACKJACK') {
+                const winnings = this.currentBet * 1.5;
+                this.bankroll += this.currentBet + winnings;
+                message += `\n+$${winnings}`;
+            } else if (outcome === 'PUSH') {
+                this.bankroll += this.currentBet;
+                message += `\nRETURNED $${this.currentBet}`;
+            } else {
+                message += `\n-$${this.currentBet}`;
+            }
+            
+            this.updateFinancials();
+            
             this.statusText.setText(message);
             this.statusText.setScale(1);
             this.tweens.add({
                 targets: this.statusText,
-                scale: 1.2,
+                scale: 1.1,
                 yoyo: true,
                 duration: 300,
                 ease: 'Quad.easeInOut'
@@ -500,14 +562,15 @@ window.launchGame = function(containerId) {
             
             if (options.length === 0) return;
             
-            const totalWidth = options.length * 300;
-            const startX = -totalWidth / 2 + 150;
+            const itemWidth = 240;
+            const totalWidth = options.length * itemWidth;
+            const startX = -totalWidth / 2 + (itemWidth / 2);
             
             options.forEach((opt, index) => {
-                const item = this.add.container(startX + index * 300, 0);
+                const item = this.add.container(startX + index * itemWidth, 0);
                 const bg = this.add.graphics();
                 const txt = this.add.text(0, 0, opt, {
-                    fontFamily: 'sans-serif', fontSize: '36px', color: '#ffffff', fontStyle: 'bold'
+                    fontFamily: 'sans-serif', fontSize: '32px', color: '#ffffff', fontStyle: 'bold'
                 }).setOrigin(0.5);
                 
                 item.add([bg, txt]);
@@ -522,21 +585,25 @@ window.launchGame = function(containerId) {
         }
 
         drawMenuSelection() {
+            const btnW = 220;
+            const btnH = 70;
+            const radius = 35;
+            
             this.menuItems.forEach((item, index) => {
                 item.bg.clear();
                 if (index === this.selectedOptionIndex) {
                     item.bg.fillStyle(0x64ffda, 0.2);
-                    item.bg.fillRoundedRect(-120, -40, 240, 80, 40);
+                    item.bg.fillRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
                     item.bg.lineStyle(4, 0x64ffda, 1);
-                    item.bg.strokeRoundedRect(-120, -40, 240, 80, 40);
+                    item.bg.strokeRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
                     item.txt.setColor('#64ffda');
                     item.txt.setShadow(0, 0, '#64ffda', 10, false, true);
                     item.setScale(1.1);
                 } else {
                     item.bg.fillStyle(0x112240, 0.8);
-                    item.bg.fillRoundedRect(-120, -40, 240, 80, 40);
+                    item.bg.fillRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
                     item.bg.lineStyle(2, 0x233554, 1);
-                    item.bg.strokeRoundedRect(-120, -40, 240, 80, 40);
+                    item.bg.strokeRoundedRect(-btnW/2, -btnH/2, btnW, btnH, radius);
                     item.txt.setColor('#8892b0');
                     item.txt.setShadow(0,0,'#000',0,false,false);
                     item.setScale(1.0);
@@ -565,15 +632,38 @@ window.launchGame = function(containerId) {
 
         executeOption() {
             const opt = this.options[this.selectedOptionIndex];
-            if (opt === 'DEAL') {
-                this.dealInitial();
+            
+            if (opt === 'RESTART') {
+                this.bankroll = 1000;
+                this.currentBet = 0;
+                this.startBetting();
+            } else if (this.gameState === 'BETTING') {
+                if (opt === '+ $10') {
+                    if (this.currentBet + 10 <= this.bankroll) this.currentBet += 10;
+                    else this.currentBet = this.bankroll;
+                } else if (opt === '+ $50') {
+                    if (this.currentBet + 50 <= this.bankroll) this.currentBet += 50;
+                    else this.currentBet = this.bankroll;
+                } else if (opt === 'CLEAR') {
+                    this.currentBet = 0;
+                } else if (opt === 'ALL IN') {
+                    this.currentBet = this.bankroll;
+                } else if (opt === 'DEAL') {
+                    if (this.currentBet > 0) {
+                        this.bankroll -= this.currentBet;
+                        this.updateFinancials();
+                        this.dealInitial();
+                    } else {
+                        this.tweens.add({ targets: this.betText, scale: 1.2, yoyo: true, duration: 150 });
+                    }
+                }
+                this.updateFinancials();
             } else if (opt === 'HIT') {
                 this.playerHit();
             } else if (opt === 'STAND') {
                 this.playerStand();
             } else if (opt === 'PLAY AGAIN') {
-                this.resetGame();
-                this.dealInitial();
+                this.startBetting();
             }
         }
     }
