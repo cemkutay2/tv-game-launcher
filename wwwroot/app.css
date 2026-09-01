@@ -17,7 +17,15 @@ html, body {
     padding: 60px 80px; /* Safe zones for TV */
     width: 100vw;
     height: 100vh;
+    overflow-y: auto; /* Enable vertical scrolling */
     box-sizing: border-box;
+    /* Hide scrollbar for a clean TV look */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.launcher-container::-webkit-scrollbar {
+    display: none;
 }
 
 .header {

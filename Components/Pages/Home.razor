@@ -56,8 +56,12 @@
         };
 
         // Fetch games.json via JS since HttpClient isn't registered by default in MAUI Blazor
-        var json = await JSRuntime.InvokeAsync<string>("eval", "fetch('games.json').then(r => r.text())");
+        var json = await JSRuntime.InvokeAsync<string>("eval", "fetch('games.json?t=' + new Date().getTime()).then(r => r.text())");
         games = JsonSerializer.Deserialize<List<GameEntry>>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        
+        // Ensure UI updates before binding JS logic
+        StateHasChanged();
+        await JSRuntime.InvokeVoidAsync("appLauncher.initSpatialNavigation");
     }
 
     private async Task LaunchGame(string scriptPath)

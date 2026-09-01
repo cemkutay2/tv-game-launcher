@@ -46,3 +46,63 @@ window.appLauncher = {
         window.launchGame = null;
     }
 };
+
+// Initialize TV remote spatial navigation
+window.appLauncher.initSpatialNavigation = function() {
+    if (window.appLauncher.navInitialized) return;
+    window.appLauncher.navInitialized = true;
+
+    document.addEventListener('keydown', function(e) {
+        if (window.appLauncher.activeGame) return; // Let Phaser handle inputs
+
+        const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'];
+        if (!keys.includes(e.key)) return;
+
+        const cards = Array.from(document.querySelectorAll('.game-card'));
+        if (cards.length === 0) return;
+
+        let currentIndex = cards.indexOf(document.activeElement);
+
+        // First press focuses the first item
+        if (currentIndex === -1) {
+            cards[0].focus();
+            e.preventDefault();
+            return;
+        }
+
+        const currentCard = cards[currentIndex];
+        const currentRect = currentCard.getBoundingClientRect();
+        
+        // Find cards in the same row to determine grid columns
+        const rowCards = cards.filter(c => Math.abs(c.getBoundingClientRect().top - currentRect.top) < 10);
+        const cols = rowCards.length;
+
+        let nextIndex = currentIndex;
+
+        if (e.key === 'ArrowRight') {
+            nextIndex = Math.min(currentIndex + 1, cards.length - 1);
+        } else if (e.key === 'ArrowLeft') {
+            nextIndex = Math.max(currentIndex - 1, 0);
+        } else if (e.key === 'ArrowDown') {
+            nextIndex = Math.min(currentIndex + cols, cards.length - 1);
+        } else if (e.key === 'ArrowUp') {
+            nextIndex = Math.max(currentIndex - cols, 0);
+        } else if (e.key === 'Enter') {
+            currentCard.click();
+            e.preventDefault();
+            return;
+        }
+
+        if (nextIndex !== currentIndex) {
+            e.preventDefault(); // Stop default scroll
+            const nextCard = cards[nextIndex];
+            nextCard.focus();
+            
+            // Smoothly scroll the container to keep the focused card perfectly visible
+            nextCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+            // Prevent default even if we hit the edge of the grid
+            e.preventDefault();
+        }
+    });
+};
