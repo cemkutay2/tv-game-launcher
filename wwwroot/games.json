@@ -22,5 +22,17 @@
     "title": "Neon Blackjack",
     "thumbnail": "games/blackjack/thumb.png",
     "script": "games/blackjack/game.js"
+  },
+  {
+    "id": "well-rested-souls",
+    "title": "Well-Rested Souls",
+    "thumbnail": "games/well-rested-souls/thumb.png",
+    "script": "games/well-rested-souls/game.js"
+  },
+  {
+    "id": "midnight-bellhop",
+    "title": "The Midnight Bellhop",
+    "thumbnail": "games/midnight-bellhop/thumb.png",
+    "script": "games/midnight-bellhop/game.js"
   }
 ]

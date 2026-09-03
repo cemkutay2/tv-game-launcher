@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midnight Bellhop - Visual Level Editor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: white;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            margin-top: 0;
+            color: #00f3ff;
+        }
+        #toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .tool-btn {
+            background-color: #333;
+            color: white;
+            border: 2px solid transparent;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tool-btn:hover {
+            background-color: #444;
+        }
+        .tool-btn.active {
+            border-color: #00f3ff;
+            background-color: #222;
+        }
+        .tool-preview {
+            width: 20px;
+            height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: black;
+            border: 1px solid #000;
+        }
+        #canvas-container {
+            user-select: none;
+            background-color: #140809;
+            border: 4px solid #471d21;
+            cursor: crosshair;
+        }
+        .row {
+            display: flex;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            box-sizing: border-box;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .cell:hover {
+            border-color: #fff;
+            z-index: 10;
+        }
+        #output-container {
+            margin-top: 20px;
+            width: 800px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            background: #1e1e1e;
+            color: #00ffaa;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            resize: none;
+        }
+        .export-btn {
+            background-color: #00f3ff;
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 10px;
+            float: right;
+        }
+        .export-btn:hover {
+            background-color: #00c3cc;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Midnight Bellhop Level Editor</h1>
+
+    <div id="toolbar">
+        <button class="tool-btn active" data-char="W">
+            <div class="tool-preview" style="background-color: #4a2529;"></div> W (Wall)
+        </button>
+        <button class="tool-btn" data-char=".">
+            <div class="tool-preview" style="background-color: #140809; border-color:#555"></div> . (Empty)
+        </button>
+        <button class="tool-btn" data-char="P">
+            <div class="tool-preview" style="background-color: #00f3ff;"></div> P (Player)
+        </button>
+        <button class="tool-btn" data-char="E">
+            <div class="tool-preview" style="background-color: #00ffaa;"></div> E (Elevator)
+        </button>
+        <button class="tool-btn" data-char="L">
+            <div class="tool-preview" style="background-color: #ffd700;"></div> L (Luggage)
+        </button>
+        <button class="tool-btn" data-char="<">
+            <div class="tool-preview" style="background-color: #ff003c; color: white"><</div> < (Cart Left)
+        </button>
+        <button class="tool-btn" data-char=">">
+            <div class="tool-preview" style="background-color: #ff003c; color: white">></div> > (Cart Right)
+        </button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="output-container">
+        <h3>Generated Level Code (Paste into game.js)</h3>
+        <textarea id="output" readonly></textarea>
+        <button class="export-btn" id="copy-btn">Copy to Clipboard</button>
+    </div>
+
+    <script>
+        const GRID_W = 16;
+        const GRID_H = 9;
+        let currentTool = 'W';
+        let isMouseDown = false;
+
+        const colors = {
+            'W': { bg: '#4a2529', text: '' },
+            '.': { bg: '#140809', text: '' },
+            'P': { bg: '#140809', text: 'P', color: '#00f3ff' },
+            'E': { bg: '#140809', text: 'E', color: '#00ffaa' },
+            'L': { bg: '#140809', text: 'L', color: '#ffd700' },
+            '<': { bg: '#140809', text: '<', color: '#ff003c' },
+            '>': { bg: '#140809', text: '>', color: '#ff003c' }
+        };
+
+        const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill('.'));
+
+        // Init border walls
+        for (let x = 0; x < GRID_W; x++) { grid[0][x] = 'W'; grid[GRID_H-1][x] = 'W'; }
+        for (let y = 0; y < GRID_H; y++) { grid[y][0] = 'W'; grid[y][GRID_W-1] = 'W'; }
+
+        const container = document.getElementById('canvas-container');
+        
+        function renderCell(x, y, cellDiv) {
+            const char = grid[y][x];
+            cellDiv.style.backgroundColor = colors[char].bg;
+            cellDiv.textContent = colors[char].text;
+            cellDiv.style.color = colors[char].color || 'black';
+        }
+
+        function paint(x, y, cellDiv) {
+            if (grid[y][x] !== currentTool) {
+                grid[y][x] = currentTool;
+                renderCell(x, y, cellDiv);
+                updateOutput();
+            }
+        }
+
+        // Build grid
+        for (let y = 0; y < GRID_H; y++) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            for (let x = 0; x < GRID_W; x++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                renderCell(x, y, cell);
+                
+                cell.addEventListener('mousedown', (e) => {
+                    isMouseDown = true;
+                    paint(x, y, cell);
+                });
+                cell.addEventListener('mouseenter', (e) => {
+                    if (isMouseDown) paint(x, y, cell);
+                });
+                row.appendChild(cell);
+            }
+            container.appendChild(row);
+        }
+
+        document.addEventListener('mouseup', () => isMouseDown = false);
+
+        // Tool selection
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTool = btn.dataset.char;
+            });
+        });
+
+        function updateOutput() {
+            let result = "[\n";
+            for (let y = 0; y < GRID_H; y++) {
+                result += `    "${grid[y].join('')}"${y < GRID_H - 1 ? ',' : ''}\n`;
+            }
+            result += "]";
+            document.getElementById('output').value = result;
+        }
+
+        document.getElementById('copy-btn').addEventListener('click', () => {
+            const textarea = document.getElementById('output');
+            textarea.select();
+            document.execCommand('copy');
+            const btn = document.getElementById('copy-btn');
+            btn.textContent = "Copied!";
+            setTimeout(() => btn.textContent = "Copy to Clipboard", 2000);
+        });
+
+        updateOutput();
+    </script>
+</body>
+</html>
