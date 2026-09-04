@@ -26,6 +26,21 @@ window.launchGame = function(containerId) {
             this.tents = [];
         }
 
+        init() {
+            this.stardust = 0;
+            this.nodes = [];
+            this.selectedIndex = 0;
+            this.previousBottomIndex = 0;
+            this.lastInputTime = 0;
+            this.isAmbient = false;
+            this.followingTravelers = [];
+            this.ambientTween = null;
+            this.camTween = null;
+            this.tents = [];
+            this.tier2Revealed = false;
+            this.nextAITime = 0;
+        }
+
         preload() {
             this.createCircleTexture('orb', 10, 0xffffff);
             this.createCircleTexture('glow', 32, 0xffffff, 0.5);
@@ -367,15 +382,10 @@ window.launchGame = function(containerId) {
             // Highlight cursor
             this.cursor = this.add.graphics();
             this.worldContainer.add(this.cursor);
-            this.cursor.lineStyle(6, 0xffffff, 1);
-            this.cursor.beginPath();
-            this.cursor.moveTo(0, -60);
-            this.cursor.lineTo(60, 0);
-            this.cursor.lineTo(0, 60);
-            this.cursor.lineTo(-60, 0);
-            this.cursor.closePath();
-            this.cursor.strokePath();
             this.cursor.setBlendMode('ADD');
+            
+            // Draw the initial correct cursor shape
+            this.updateSelection(true);
             
             this.tweens.add({
                 targets: this.cursor,
@@ -764,7 +774,7 @@ window.launchGame = function(containerId) {
             });
         }
 
-        updateSelection() {
+        updateSelection(skipCamera = false) {
             const node = this.nodes[this.selectedIndex];
             this.cursor.setPosition(node.x, node.y);
             
@@ -778,33 +788,39 @@ window.launchGame = function(containerId) {
             
             if (isPentagon) {
                 for (let i = 0; i < 5; i++) {
-                    const angle = (i * 2 * Math.PI / 5) - (Math.PI / 2);
-                    const px = radius * Math.cos(angle);
-                    const py = radius * Math.sin(angle);
-                    if (i === 0) this.cursor.moveTo(px, py);
-                    else this.cursor.lineTo(px, py);
+                    const angle = (i * 2 * Math.PI) / 5 - Math.PI / 2;
+                    const x = radius * Math.cos(angle);
+                    const y = radius * Math.sin(angle);
+                    if (i === 0) this.cursor.moveTo(x, y);
+                    else this.cursor.lineTo(x, y);
                 }
             } else {
-                this.cursor.moveTo(0, -radius);
-                this.cursor.lineTo(radius, 0);
-                this.cursor.lineTo(0, radius);
-                this.cursor.lineTo(-radius, 0);
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i * 2 * Math.PI) / 4;
+                    const x = radius * Math.cos(angle);
+                    const y = radius * Math.sin(angle);
+                    if (i === 0) this.cursor.moveTo(x, y);
+                    else this.cursor.lineTo(x, y);
+                }
             }
             this.cursor.closePath();
             this.cursor.strokePath();
             
-            if (this.camTween) {
-                this.camTween.stop();
-            }
-            if (this.gameState !== 'menu') {
-                this.camTween = this.tweens.add({
-                    targets: this.cameras.main,
-                    scrollX: node.x - 1920/2,
-                    scrollY: node.y - 1080/2 - 30,
-                    zoom: 0.85,
-                    duration: 600,
-                    ease: 'Power2'
-                });
+            if (!skipCamera) {
+                if (this.camTween) {
+                    this.camTween.stop();
+                }
+                
+                if (this.gameState !== 'menu') {
+                    this.camTween = this.tweens.add({
+                        targets: this.cameras.main,
+                        scrollX: node.x - 1920/2,
+                        scrollY: node.y - 1080/2 - 30,
+                        zoom: 0.85,
+                        duration: 600,
+                        ease: 'Power2'
+                    });
+                }
             }
         }
 
@@ -1132,7 +1148,7 @@ window.launchGame = function(containerId) {
 
         enterAmbientMode() {
             this.isAmbient = true;
-            
+            this.tweens.killTweensOf(this.cameras.main);
             this.tweens.killTweensOf([this.uiContainer, this.cursor, this.vignette]);
             this.nodes.forEach(node => {
                 if (node.textObj) this.tweens.killTweensOf(node.textObj);
@@ -1217,6 +1233,7 @@ window.launchGame = function(containerId) {
         exitAmbientMode() {
             this.isAmbient = false;
             
+            this.tweens.killTweensOf(this.cameras.main);
             this.tweens.killTweensOf([this.uiContainer, this.cursor, this.vignette]);
             this.nodes.forEach(node => {
                 if (node.textObj) this.tweens.killTweensOf(node.textObj);
@@ -1368,6 +1385,11 @@ window.launchGame = function(containerId) {
                 });
                 
                 this.drawConstellationLines();
+                
+                // If in idle mode, recalculate bounding box and zoom out to reveal the new massive area
+                if (this.isAmbient) {
+                    this.enterAmbientMode();
+                }
                 
                 // Show a big notification in the center of the screen
                 const announcement = this.add.text(1920/2, 1080/2 - 300, 'Constellation Expanding!', {
