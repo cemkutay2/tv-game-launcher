@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0e1017">
+    <title>Party Game Controller</title>
+    <link rel="stylesheet" href="/controller/css/controller.css">
+    <link rel="icon" href="data:,">
+</head>
+<body>
+    <div id="app">
+        <!-- Top header bar (shown in lobby & game) -->
+        <header id="top-bar" class="top-bar" style="display: none;">
+            <div id="room-badge" class="room-badge">ROOM ----</div>
+            <div id="player-chip" class="player-chip">
+                <div id="player-avatar-dot" class="player-avatar-dot"></div>
+                <span id="player-name-display">Player</span>
+            </div>
+        </header>
+
+        <div class="view-container">
+            <!-- 1. JOIN VIEW -->
+            <section id="view-join" class="screen-view active">
+                <div class="join-card">
+                    <h1 class="join-title">Party Controller</h1>
+                    <p class="join-subtitle">Join the game on your Smart TV</p>
+
+                    <div class="input-group">
+                        <label for="input-room-code">Room Code</label>
+                        <input id="input-room-code" class="input-control room-input" type="text" maxlength="4" placeholder="ABCD" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="input-player-name">Your Name</label>
+                        <input id="input-player-name" class="input-control" type="text" maxlength="16" placeholder="Your Nickname">
+                    </div>
+
+                    <div class="input-group">
+                        <label>Choose Color</label>
+                        <div id="color-swatches" class="color-swatches">
+                            <div class="color-swatch selected" data-color="#FF4757" style="background-color: #FF4757;"></div>
+                            <div class="color-swatch" data-color="#00D2D3" style="background-color: #00D2D3;"></div>
+                            <div class="color-swatch" data-color="#2ED573" style="background-color: #2ED573;"></div>
+                            <div class="color-swatch" data-color="#FFA502" style="background-color: #FFA502;"></div>
+                            <div class="color-swatch" data-color="#9B59B6" style="background-color: #9B59B6;"></div>
+                            <div class="color-swatch" data-color="#FF6B81" style="background-color: #FF6B81;"></div>
+                            <div class="color-swatch" data-color="#1E90FF" style="background-color: #1E90FF;"></div>
+                            <div class="color-swatch" data-color="#ECCC68" style="background-color: #ECCC68;"></div>
+                        </div>
+                    </div>
+
+                    <button id="btn-join" class="btn-primary">Join Room</button>
+                </div>
+            </section>
+
+            <!-- 2. LOBBY VIEW -->
+            <section id="view-lobby" class="screen-view">
+                <div class="lobby-card">
+                    <div id="lobby-avatar" class="player-big-avatar">P</div>
+                    <div id="lobby-player-name" class="player-welcome-name">Player</div>
+                    <div id="lobby-status-pill" class="status-pill">Status: Waiting...</div>
+
+                    <button id="btn-ready" class="btn-ready not-ready">READY UP!</button>
+
+                    <div class="game-preview-box">
+                        <div class="game-preview-label">Next Party Game</div>
+                        <div id="game-preview-title" class="game-preview-title">Quick Buzzer Party</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. GAME VIEW (Dynamic skins mount here) -->
+            <section id="view-game" class="screen-view game-view">
+                <div id="game-container" style="width: 100%; height: 100%;">
+                    <!-- Dynamically mounted layout (BUZZER / FOUR_BUTTONS / DPAD) -->
+                </div>
+            </section>
+
+            <!-- 4. GAME OVER VIEW -->
+            <section id="view-gameover" class="screen-view">
+                <div class="gameover-card">
+                    <div class="trophy-icon">🏆</div>
+                    <h2 class="gameover-title">ROUND OVER</h2>
+                    <p id="winner-name-text" class="winner-name">Checking results...</p>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem;">Look at the TV screen for scores!</p>
+                </div>
+            </section>
+        </div>
+
+        <div id="toast" class="toast-msg"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/controller/js/wakeLock.js"></script>
+    <script src="/controller/js/haptics.js"></script>
+    <script src="/controller/js/controllerNetwork.js"></script>
+    <script src="/controller/js/controllerApp.js"></script>
+</body>
+</html>

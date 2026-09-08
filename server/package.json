@@ -1,0 +1,14 @@
+{
+  "name": "tv-party-server",
+  "version": "1.0.0",
+  "description": "Room & Lobby WebSocket and HTTP Server for Hotel Smart TVs and Mobile Controllers",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/protocol.test.js"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  }
+}
