@@ -24,20 +24,12 @@ class LobbyScene extends Phaser.Scene {
                 color: 0xFF4757
             },
             {
-                id: 'party-quiz',
-                title: '🧠 4-Button Trivia',
-                description: 'Multiplayer 4-choice trivia showdown.',
-                layout: 'FOUR_BUTTONS',
-                sceneKey: 'DemoBuzzerGameScene', // Fallback to buzzer demo
-                color: 0x1E90FF
-            },
-            {
-                id: 'retro-arcade',
-                title: '🕹️ Retro Arcade Duel',
-                description: 'Classic D-pad arcade party competition.',
+                id: 'neon-tanks',
+                title: '💥 Neon Tank Arena',
+                description: '2-8 player retro tank battle with bouncing laser shells!',
                 layout: 'DPAD_ACTION',
-                sceneKey: 'DemoBuzzerGameScene', // Fallback to buzzer demo
-                color: 0x2ED573
+                sceneKey: 'NeonTankGameScene',
+                color: 0x00D2D3
             }
         ];
         this.selectedGameIndex = 0;

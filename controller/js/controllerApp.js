@@ -282,6 +282,10 @@ class ControllerApp {
 
     switchView(viewName) {
         this.currentView = viewName;
+        const appElem = document.getElementById('app');
+        if (viewName !== 'GAME_VIEW' && appElem) {
+            appElem.classList.remove('layout-gamepad');
+        }
         for (const [key, element] of Object.entries(this.views)) {
             if (key === viewName) {
                 element.classList.add('active');
@@ -296,16 +300,18 @@ class ControllerApp {
      */
     mountGameLayout(layoutType) {
         this.gameContainer.innerHTML = '';
+        const appElem = document.getElementById('app');
 
-        if (layoutType === 'BUZZER') {
-            this.mountBuzzerSkin();
-        } else if (layoutType === 'FOUR_BUTTONS') {
-            this.mountFourButtonsSkin();
-        } else if (layoutType === 'DPAD_ACTION') {
+        if (layoutType === 'DPAD_ACTION') {
+            if (appElem) appElem.classList.add('layout-gamepad');
             this.mountDpadSkin();
         } else {
-            // Default fallback is Buzzer
-            this.mountBuzzerSkin();
+            if (appElem) appElem.classList.remove('layout-gamepad');
+            if (layoutType === 'FOUR_BUTTONS') {
+                this.mountFourButtonsSkin();
+            } else {
+                this.mountBuzzerSkin();
+            }
         }
     }
 
@@ -401,16 +407,32 @@ class ControllerApp {
     }
 
     /**
-     * Skin: DPAD_ACTION
+     * Skin: DPAD_ACTION - Landscape Gamepad with touch-sliding D-Pad
      */
     mountDpadSkin() {
+        // Attempt orientation lock to landscape if browser permits
+        if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.lock === 'function') {
+            screen.orientation.lock('landscape').catch(() => {});
+        }
+
         const dpadContainer = document.createElement('div');
         dpadContainer.className = 'dpad-skin';
 
-        // D-Pad cluster
+        // 1. Portrait Rotation Notice
+        const hintBanner = document.createElement('div');
+        hintBanner.className = 'rotate-hint-banner';
+        hintBanner.innerHTML = '<span>🔄</span><span>Rotate phone for console gamepad</span>';
+        dpadContainer.appendChild(hintBanner);
+
+        // 2. D-Pad cluster with center hub & smooth sliding touch detection
         const dpadCluster = document.createElement('div');
         dpadCluster.className = 'dpad-cluster';
 
+        const dpadCenter = document.createElement('div');
+        dpadCenter.className = 'dpad-center';
+        dpadCluster.appendChild(dpadCenter);
+
+        const dirMap = {};
         const directions = [
             { dir: 'UP', class: 'dpad-up', text: '▲' },
             { dir: 'DOWN', class: 'dpad-down', text: '▼' },
@@ -422,50 +444,128 @@ class ControllerApp {
             const btn = document.createElement('div');
             btn.className = `dpad-btn ${d.class}`;
             btn.textContent = d.text;
-
-            btn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.haptics.tap();
-                this.network.sendInput(d.dir, 'button_down');
-            }, { passive: false });
-
-            btn.addEventListener('touchend', (e) => {
-                e.preventDefault();
-                this.network.sendInput(d.dir, 'button_up');
-            }, { passive: false });
-
+            btn.dataset.dir = d.dir;
             dpadCluster.appendChild(btn);
+            dirMap[d.dir] = btn;
         });
 
-        // Action buttons cluster
+        // Direction pointer tracking (allows sliding thumb between directions smoothly)
+        let activeDir = null;
+
+        const setActiveDir = (newDir) => {
+            if (activeDir === newDir) return;
+            if (activeDir) {
+                if (dirMap[activeDir]) dirMap[activeDir].classList.remove('pressed');
+                this.network.sendInput(activeDir, 'button_up');
+            }
+            activeDir = newDir;
+            if (activeDir) {
+                if (dirMap[activeDir]) dirMap[activeDir].classList.add('pressed');
+                this.haptics.tap();
+                this.network.sendInput(activeDir, 'button_down');
+            }
+        };
+
+        const handlePointer = (e) => {
+            e.preventDefault();
+            const rect = dpadCluster.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const dx = e.clientX - cx;
+            const dy = e.clientY - cy;
+            const dist = Math.hypot(dx, dy);
+
+            // Inner deadzone threshold
+            if (dist < 18) {
+                setActiveDir(null);
+                return;
+            }
+
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            if (angle >= -135 && angle < -45) {
+                setActiveDir('UP');
+            } else if (angle >= -45 && angle < 45) {
+                setActiveDir('RIGHT');
+            } else if (angle >= 45 && angle < 135) {
+                setActiveDir('DOWN');
+            } else {
+                setActiveDir('LEFT');
+            }
+        };
+
+        const clearPointer = (e) => {
+            if (e) e.preventDefault();
+            setActiveDir(null);
+        };
+
+        dpadCluster.addEventListener('pointerdown', (e) => {
+            try { dpadCluster.setPointerCapture(e.pointerId); } catch (err) {}
+            handlePointer(e);
+        });
+        dpadCluster.addEventListener('pointermove', (e) => {
+            if (e.buttons > 0) handlePointer(e);
+        });
+        dpadCluster.addEventListener('pointerup', clearPointer);
+        dpadCluster.addEventListener('pointercancel', clearPointer);
+
+        // 3. Center HUD Display
+        const centerHud = document.createElement('div');
+        centerHud.className = 'gamepad-center-hud';
+
+        const tankDot = document.createElement('div');
+        tankDot.className = 'hud-tank-icon';
+        const playerColor = this.player ? this.player.color : '#00d2d3';
+        tankDot.style.backgroundColor = playerColor;
+        tankDot.style.color = playerColor;
+
+        const playerName = document.createElement('div');
+        playerName.className = 'hud-player-name';
+        playerName.textContent = this.player ? this.player.name : 'Player';
+
+        const helpText = document.createElement('div');
+        helpText.className = 'hud-help-text';
+        helpText.textContent = 'A: FIRE  |  B: BOOST';
+
+        centerHud.appendChild(tankDot);
+        centerHud.appendChild(playerName);
+        centerHud.appendChild(helpText);
+
+        // 4. Action buttons cluster (A & B)
         const actionCluster = document.createElement('div');
         actionCluster.className = 'action-buttons-cluster';
 
         const actions = [
-            { label: 'B', class: 'btn-b', action: 'B' },
-            { label: 'A', class: 'btn-a', action: 'A' }
+            { action: 'B', class: 'btn-b', letter: 'B', sublabel: 'BOOST' },
+            { action: 'A', class: 'btn-a', letter: 'A', sublabel: 'FIRE' }
         ];
 
         actions.forEach(act => {
             const btn = document.createElement('button');
             btn.className = `action-round-btn ${act.class}`;
-            btn.textContent = act.label;
+            btn.innerHTML = `<span class="btn-letter">${act.letter}</span><span class="btn-sublabel">${act.sublabel}</span>`;
 
-            btn.addEventListener('touchstart', (e) => {
+            const startPress = (e) => {
                 e.preventDefault();
-                this.haptics.tap();
+                this.haptics.buzz();
+                btn.classList.add('pressed');
                 this.network.sendInput(act.action, 'button_down');
-            }, { passive: false });
+            };
 
-            btn.addEventListener('touchend', (e) => {
+            const endPress = (e) => {
                 e.preventDefault();
+                btn.classList.remove('pressed');
                 this.network.sendInput(act.action, 'button_up');
-            }, { passive: false });
+            };
+
+            btn.addEventListener('pointerdown', startPress);
+            btn.addEventListener('pointerup', endPress);
+            btn.addEventListener('pointercancel', endPress);
 
             actionCluster.appendChild(btn);
         });
 
         dpadContainer.appendChild(dpadCluster);
+        dpadContainer.appendChild(centerHud);
         dpadContainer.appendChild(actionCluster);
         this.gameContainer.appendChild(dpadContainer);
     }

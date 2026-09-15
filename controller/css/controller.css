@@ -446,66 +446,269 @@ html, body {
     letter-spacing: 1px;
 }
 
-/* Skin: DPAD_ACTION */
+/* Skin: DPAD_ACTION - Handheld Console Gamepad (Landscape Optimized) */
+.layout-gamepad #top-bar {
+    padding: 6px 16px;
+}
+
+@media (orientation: landscape) {
+    .layout-gamepad #top-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: transparent;
+        border-bottom: none;
+        pointer-events: none;
+        padding: 8px 24px;
+    }
+    .layout-gamepad #top-bar .room-badge,
+    .layout-gamepad #top-bar .player-chip {
+        pointer-events: auto;
+        opacity: 0.65;
+        transition: opacity 0.2s;
+    }
+    .layout-gamepad #top-bar:hover .room-badge,
+    .layout-gamepad #top-bar:hover .player-chip {
+        opacity: 1;
+    }
+}
+
 .dpad-skin {
     width: 100%;
     height: 100%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     justify-content: space-between;
-    padding: 16px;
+    padding: 12px 24px;
+    position: relative;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
+/* Portrait fallback: Stack vertically with rotation notice */
+@media (orientation: portrait) {
+    .dpad-skin {
+        flex-direction: column;
+        justify-content: space-around;
+        padding: 12px 16px;
+    }
+    .rotate-hint-banner {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0, 210, 211, 0.15);
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 8px 14px;
+        border-radius: 20px;
+        margin-bottom: 8px;
+        animation: pulseHint 2s infinite ease-in-out;
+    }
+}
+
+@media (orientation: landscape) {
+    .rotate-hint-banner {
+        display: none !important;
+    }
+}
+
+@keyframes pulseHint {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.03); opacity: 1; }
+}
+
+/* D-Pad Base & Cross */
 .dpad-cluster {
-    width: 200px;
-    height: 200px;
+    width: 210px;
+    height: 210px;
     position: relative;
-    margin: 0 auto;
+    background: radial-gradient(circle at center, #1b2132 0%, #111420 70%);
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 4px 12px rgba(0, 0, 0, 0.5);
+    touch-action: none;
+    flex-shrink: 0;
+}
+
+.dpad-center {
+    position: absolute;
+    top: 72px;
+    left: 72px;
+    width: 66px;
+    height: 66px;
+    background: #181d2c;
+    border-radius: 50%;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.6);
+    pointer-events: none;
 }
 
 .dpad-btn {
     position: absolute;
-    background: #252a3b;
-    border: 2px solid rgba(255,255,255,0.15);
-    color: #fff;
-    font-size: 1.5rem;
-    border-radius: 12px;
+    background: linear-gradient(135deg, #242c3e, #1c2231);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    color: #e0e6ed;
+    font-size: 1.4rem;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    transition: background 0.08s, transform 0.08s, box-shadow 0.08s, color 0.08s;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-.dpad-btn:active { background: var(--accent); color: #000; }
-.dpad-up { top: 0; left: 66px; width: 68px; height: 64px; }
-.dpad-down { bottom: 0; left: 66px; width: 68px; height: 64px; }
-.dpad-left { top: 66px; left: 0; width: 64px; height: 68px; }
-.dpad-right { top: 66px; right: 0; width: 64px; height: 68px; }
+.dpad-btn.pressed, .dpad-btn:active {
+    background: linear-gradient(135deg, #00d2d3, #2ed573) !important;
+    color: #0c151e !important;
+    box-shadow: 0 0 18px rgba(0, 210, 211, 0.8) !important;
+    border-color: #ffffff !important;
+}
 
-.action-buttons-cluster {
+.dpad-up {
+    top: 6px;
+    left: 72px;
+    width: 66px;
+    height: 68px;
+    border-radius: 16px 16px 6px 6px;
+}
+
+.dpad-down {
+    bottom: 6px;
+    left: 72px;
+    width: 66px;
+    height: 68px;
+    border-radius: 6px 6px 16px 16px;
+}
+
+.dpad-left {
+    top: 72px;
+    left: 6px;
+    width: 68px;
+    height: 66px;
+    border-radius: 16px 6px 6px 16px;
+}
+
+.dpad-right {
+    top: 72px;
+    right: 6px;
+    width: 68px;
+    height: 66px;
+    border-radius: 6px 16px 16px 6px;
+}
+
+/* Center HUD for landscape gamepad */
+.gamepad-center-hud {
     display: flex;
-    justify-content: space-around;
-    gap: 20px;
-    width: 100%;
-    max-width: 320px;
-    margin: 20px auto 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(18, 22, 33, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    text-align: center;
+    pointer-events: none;
+}
+
+.hud-tank-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    box-shadow: 0 0 10px currentColor;
+    display: inline-block;
+}
+
+.hud-player-name {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #ffffff;
+}
+
+.hud-help-text {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+/* Action buttons cluster (A & B) */
+.action-buttons-cluster {
+    position: relative;
+    width: 200px;
+    height: 180px;
+    flex-shrink: 0;
 }
 
 .action-round-btn {
-    width: 80px;
-    height: 80px;
+    position: absolute;
     border-radius: 50%;
-    border: none;
-    font-size: 2rem;
+    border: 3px solid rgba(255, 255, 255, 0.25);
+    color: #ffffff;
     font-weight: 900;
-    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.4);
+    transition: transform 0.08s, filter 0.08s, box-shadow 0.08s;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-.action-round-btn.btn-a { background: #2ed573; color: #0f2b1c; }
-.action-round-btn.btn-b { background: #ff4757; }
-.action-round-btn:active { transform: scale(0.92); }
+.action-round-btn:active, .action-round-btn.pressed {
+    transform: scale(0.92);
+    filter: brightness(1.3);
+}
+
+/* Button A: Primary Fire */
+.action-round-btn.btn-a {
+    bottom: 8px;
+    right: 12px;
+    width: 88px;
+    height: 88px;
+    background: radial-gradient(circle at 35% 35%, #2ed573, #1e9950 70%, #106634);
+    box-shadow: 0 8px 24px rgba(46, 213, 115, 0.45), inset 0 3px 6px rgba(255, 255, 255, 0.4);
+}
+
+.action-round-btn.btn-a .btn-letter {
+    font-size: 1.8rem;
+    line-height: 1;
+}
+
+.action-round-btn.btn-a .btn-sublabel {
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    color: #bbf7d0;
+    margin-top: 2px;
+}
+
+/* Button B: Boost */
+.action-round-btn.btn-b {
+    top: 8px;
+    left: 12px;
+    width: 78px;
+    height: 78px;
+    background: radial-gradient(circle at 35% 35%, #ff4757, #d63031 70%, #911b1c);
+    box-shadow: 0 8px 24px rgba(255, 71, 87, 0.45), inset 0 3px 6px rgba(255, 255, 255, 0.4);
+}
+
+.action-round-btn.btn-b .btn-letter {
+    font-size: 1.6rem;
+    line-height: 1;
+}
+
+.action-round-btn.btn-b .btn-sublabel {
+    font-size: 0.65rem;
+    letter-spacing: 1px;
+    color: #fecdd3;
+    margin-top: 2px;
+}
 
 /* ==========================================================================
    GAME OVER VIEW

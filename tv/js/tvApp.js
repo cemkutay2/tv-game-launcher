@@ -14,7 +14,8 @@ window.addEventListener('DOMContentLoaded', () => {
         },
         scene: [
             window.LobbyScene,
-            window.DemoBuzzerGameScene
+            window.DemoBuzzerGameScene,
+            window.NeonTankGameScene
         ]
     };
 

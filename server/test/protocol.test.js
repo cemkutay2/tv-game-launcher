@@ -170,6 +170,55 @@ async function runProtocolTests() {
         assert.strictEqual(hostLobby.payload.roomState.roomState, 'LOBBY');
         console.log('  ✓ Return to lobby synchronized across all clients');
 
+        // 8. Host Selects Neon Tank Arena
+        console.log('[Test 8] Host selects Neon Tank Arena (GAME_SELECT)...');
+        hostWs.send(JSON.stringify({
+            type: 'GAME_SELECT',
+            roomId,
+            senderId: 'host_tv',
+            payload: { gameId: 'neon-tanks', gameTitle: '💥 Neon Tank Arena' }
+        }));
+        const p1GameSelect = await waitForMessage(p1Ws, 'GAME_SELECT');
+        assert.strictEqual(p1GameSelect.payload.gameId, 'neon-tanks');
+        console.log('  ✓ Game selection broadcasted to controllers');
+
+        // 9. Host Starts Neon Tank Arena (DPAD_ACTION)
+        console.log('[Test 9] Host starts Neon Tank Arena with DPAD_ACTION layout...');
+        hostWs.send(JSON.stringify({
+            type: 'GAME_START',
+            roomId,
+            senderId: 'host_tv',
+            payload: { gameId: 'neon-tanks', controllerLayoutType: 'DPAD_ACTION' }
+        }));
+        const [p1TankStart, hostTankStart] = await Promise.all([
+            waitForMessage(p1Ws, 'GAME_START'),
+            waitForMessage(hostWs, 'GAME_STARTED')
+        ]);
+        assert.strictEqual(p1TankStart.payload.controllerLayoutType, 'DPAD_ACTION');
+        assert.strictEqual(hostTankStart.payload.gameId, 'neon-tanks');
+        console.log('  ✓ Neon Tank Arena started with DPAD_ACTION layout confirmed');
+
+        // 10. D-Pad and Action Button Input Forwarding
+        console.log('[Test 10] Player 1 drives UP and fires A...');
+        p1Ws.send(JSON.stringify({
+            type: 'CONTROLLER_INPUT',
+            roomId,
+            senderId: p1Id,
+            payload: { inputType: 'button_down', action: 'UP' }
+        }));
+        const moveMsg = await waitForMessage(hostWs, 'PLAYER_INPUT');
+        assert.strictEqual(moveMsg.payload.action, 'UP');
+
+        p1Ws.send(JSON.stringify({
+            type: 'CONTROLLER_INPUT',
+            roomId,
+            senderId: p1Id,
+            payload: { inputType: 'button_down', action: 'A' }
+        }));
+        const fireMsg = await waitForMessage(hostWs, 'PLAYER_INPUT');
+        assert.strictEqual(fireMsg.payload.action, 'A');
+        console.log('  ✓ D-Pad movement and firing inputs verified');
+
         // Cleanup
         hostWs.close();
         p1Ws.close();
