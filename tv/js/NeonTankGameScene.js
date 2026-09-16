@@ -128,7 +128,7 @@ class NeonTankGameScene extends BaseGameScene {
         this.arenaGraphics.lineTo(left + cornerLen, top);
         // Top-right
         this.arenaGraphics.moveTo(left + width - cornerLen, top);
-        this.arenaGraphics.lineTo(left + width);
+        this.arenaGraphics.lineTo(left + width, top);
         this.arenaGraphics.lineTo(left + width, top + cornerLen);
         // Bottom-right
         this.arenaGraphics.moveTo(left + width, top + height - cornerLen);

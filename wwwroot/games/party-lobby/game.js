@@ -640,15 +640,22 @@
             if (!this.network) return;
             this.networkUnsubscribers.push(
                 this.network.on('PLAYER_INPUT', (payload) => this.onPlayerInput(payload.playerId, payload)),
-                this.network.on('PLAYER_DISCONNECTED', (payload) => this.onPlayerDisconnected(payload.playerId, payload)),
+                this.network.on('PLAYER_DISCONNECTED', (payload) => {
+                    if (this.playersMap.has(payload.playerId)) {
+                        this.playersMap.get(payload.playerId).connected = false;
+                    }
+                    this.onPlayerDisconnected(payload.playerId, payload);
+                }),
                 this.network.on('PLAYER_LEFT', (payload) => {
                     this.playersMap.delete(payload.playerId);
                     this.players = this.players.filter(p => p.id !== payload.playerId);
+                    this.onPlayerLeft(payload.playerId, payload);
                 }),
                 this.network.on('SCORE_UPDATED', (payload) => {
                     if (payload.player && this.playersMap.has(payload.player.id)) {
                         this.playersMap.get(payload.player.id).score = payload.player.score;
                     }
+                    this.onScoreUpdated(payload);
                 }),
                 this.network.on('RETURN_TO_LOBBY', () => this.transitionToLobby())
             );
@@ -656,6 +663,8 @@
 
         onPlayerInput(playerId, inputData) {}
         onPlayerDisconnected(playerId, payload) {}
+        onPlayerLeft(playerId, payload) {}
+        onScoreUpdated(payload) {}
 
         awardScore(playerId, pointsDelta) {
             if (!this.network || !this.playersMap.has(playerId)) return;
@@ -882,6 +891,7 @@
             this.gameState = 'ROUND_OVER';
             this.tweens.killTweensOf(this.centerRing);
             this.centerRing.setScale(1);
+            this.centerRing.setStrokeStyle(6, 0x00D2D3);
 
             if (this.buzzedPlayers.length === 0) {
                 this.statusText.setText('TIME OUT');
