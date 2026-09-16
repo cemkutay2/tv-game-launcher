@@ -2,6 +2,10 @@ window.launchGame = function(containerId) {
     const TILE_SIZE = 120;
     const GRID_W = 16;
     const GRID_H = 9;
+    // How long (ms) to hold the player at the very start of a fall, waiting
+    // for a dash key that hasn't arrived yet, before committing to falling
+    // straight down. Gives remote-control input extra time to register.
+    const AIR_DASH_GRACE_MS = 150;
 
     class BootScene extends Phaser.Scene {
         constructor() {
@@ -110,7 +114,9 @@ window.launchGame = function(containerId) {
             this.levelComplete = false;
             this.inputBuffer = [];
             this.airDashCount = 0;
-            
+            this.airGraceDeadline = null;
+            this.wasGrounded = true;
+
             this.carts = [];
             this.luggages = [];
             this.walls = [];
@@ -162,7 +168,11 @@ window.launchGame = function(containerId) {
 
             if (this.levelIndex >= levels.length) {
                 // Game Beat!
-                this.add.text(1920 / 2, 1080 / 2, 'YOU WIN!', { font: '100px Arial', fill: '#00f3ff' }).setOrigin(0.5);
+                this.add.text(1920 / 2, 1080 / 2 - 60, 'YOU WIN!', { font: '100px Arial', fill: '#00f3ff' }).setOrigin(0.5);
+                this.add.text(1920 / 2, 1080 / 2 + 60, 'Press any key to play again', { font: '40px Arial', fill: '#ffffff' }).setOrigin(0.5);
+                this.input.keyboard.once('keydown', () => {
+                    this.scene.start('PlayScene', { level: 0 });
+                });
                 return;
             }
 
@@ -204,6 +214,11 @@ window.launchGame = function(containerId) {
                 }
             }
 
+            // A level with no luggage to collect starts already "cleared"
+            if (this.totalLuggage === 0) {
+                this.elevatorSprite.setTexture('door_open');
+            }
+
             // Decorate with some text
             this.add.text(20, 20, `FLOOR ${this.levelIndex + 1}`, { font: '40px Arial', fill: '#ffffff' });
 
@@ -211,10 +226,11 @@ window.launchGame = function(containerId) {
                 // Map Enter/Space to interaction/start if needed
                 if (this.isDead || this.levelComplete) return;
 
-                if (this.inputBuffer.length < 2) {
-                    if (e.key === 'ArrowLeft') this.inputBuffer.push('LEFT');
-                    else if (e.key === 'ArrowRight') this.inputBuffer.push('RIGHT');
-                    else if (e.key === 'ArrowUp') this.inputBuffer.push('UP');
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                    e.preventDefault(); // don't let arrow keys scroll the page
+                    if (this.inputBuffer.length < 3) {
+                        this.inputBuffer.push(e.key === 'ArrowLeft' ? 'LEFT' : e.key === 'ArrowRight' ? 'RIGHT' : 'UP');
+                    }
                 }
             });
             
@@ -384,6 +400,7 @@ window.launchGame = function(containerId) {
                                 if (this.canMove(this.playerGridX + dx, this.playerGridY)) {
                                     this.airDashCount++;
                                     airMoved = true;
+                                    this.airGraceDeadline = null;
                                     this.moveTo(this.playerGridX + dx, this.playerGridY, 'jump');
                                 }
                             }
@@ -392,10 +409,25 @@ window.launchGame = function(containerId) {
                         }
                     }
                     if (!airMoved) {
-                        this.moveTo(this.playerGridX, this.playerGridY + 1, 'fall');
+                        // Just left the ground with no dash queued yet: hold here briefly
+                        // instead of instantly committing to a straight fall, so a dash
+                        // press that's still in flight (remote latency) has time to arrive.
+                        if (this.wasGrounded && this.airGraceDeadline === null) {
+                            this.airGraceDeadline = time + AIR_DASH_GRACE_MS;
+                        }
+
+                        if (this.airGraceDeadline !== null && time < this.airGraceDeadline) {
+                            // waiting out the grace window; try again next tick
+                        } else {
+                            this.airGraceDeadline = null;
+                            this.moveTo(this.playerGridX, this.playerGridY + 1, 'fall');
+                        }
                     }
+                    this.wasGrounded = false;
                 } else {
                     this.airDashCount = 0;
+                    this.airGraceDeadline = null;
+                    this.wasGrounded = true;
                     if (this.inputBuffer.length > 0) {
                         let action = this.inputBuffer.shift();
                         let dx = 0;
@@ -427,7 +459,14 @@ window.launchGame = function(containerId) {
                         let targetX = this.playerGridX + dx;
                         let targetY = this.playerGridY + dy;
 
-                        if (this.canMove(targetX, targetY)) {
+                        // For a diagonal jump, require at least one of the two orthogonal
+                        // tiles to be open, so the player can't cut through a solid corner
+                        // pinched between two walls.
+                        let cornerClear = dx === 0 || dy === 0 ||
+                            this.canMove(this.playerGridX + dx, this.playerGridY) ||
+                            this.canMove(this.playerGridX, targetY);
+
+                        if (this.canMove(targetX, targetY) && cornerClear) {
                             this.moveTo(targetX, targetY, dy === -1 ? 'jump' : 'walk');
                         } else {
                             // If diagonal blocked, try fallback
