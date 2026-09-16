@@ -1,6 +1,10 @@
 window.appLauncher = {
     activeGame: null,
-    
+
+    fetchGames: function() {
+        return fetch('games.json?t=' + new Date().getTime()).then(r => r.text());
+    },
+
     loadGame: function(scriptUrl) {
         console.log("Loading game from: " + scriptUrl);
         return new Promise((resolve, reject) => {
@@ -97,9 +101,15 @@ window.appLauncher.initSpatialNavigation = function() {
             e.preventDefault(); // Stop default scroll
             const nextCard = cards[nextIndex];
             nextCard.focus();
-            
-            // Smoothly scroll the container to keep the focused card perfectly visible
-            nextCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Only scroll when the card isn't already fully in view. Firing a smooth
+            // scroll on every keypress stacks a scroll animation on top of the card's
+            // own focus transition, which is what made navigation feel stuttery.
+            const cardRect = nextCard.getBoundingClientRect();
+            const fullyVisible = cardRect.top >= 0 && cardRect.bottom <= window.innerHeight;
+            if (!fullyVisible) {
+                nextCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
         } else {
             // Prevent default even if we hit the edge of the grid
             e.preventDefault();
