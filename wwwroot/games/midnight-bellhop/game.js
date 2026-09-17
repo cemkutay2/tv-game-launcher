@@ -184,13 +184,15 @@ window.launchGame = function(containerId) {
             g.generateTexture('wall', TILE_SIZE, TILE_SIZE);
             g.clear();
 
-            // Player (Bellhop - Neon Blue)
+            // Player (Bellhop - Neon Blue). Feet sit flush with the tile's
+            // bottom edge so the sprite doesn't visually hover above whatever
+            // it's standing on.
             g.fillStyle(0x00f3ff, 1);
-            g.fillCircle(TILE_SIZE / 2, TILE_SIZE / 2 - 15, TILE_SIZE / 4);
+            g.fillCircle(TILE_SIZE / 2, TILE_SIZE / 2 + 10, TILE_SIZE / 4);
             g.fillStyle(0xffffff, 1);
-            g.fillRect(TILE_SIZE / 2 - 15, TILE_SIZE / 2 - 5, 30, 40);
+            g.fillRect(TILE_SIZE / 2 - 15, TILE_SIZE / 2 + 20, 30, 40);
             g.fillStyle(0x00f3ff, 1);
-            g.fillRect(TILE_SIZE / 2 - 20, TILE_SIZE / 2 - 20, 40, 10); // hat
+            g.fillRect(TILE_SIZE / 2 - 20, TILE_SIZE / 2 + 5, 40, 10); // hat
             g.generateTexture('player', TILE_SIZE, TILE_SIZE);
             g.clear();
 
@@ -272,22 +274,27 @@ window.launchGame = function(containerId) {
             g.generateTexture('door_locked', TILE_SIZE, TILE_SIZE);
             g.clear();
 
-            // Moving platform (rideable, safe)
+            // Moving platform (rideable, safe). The rider stands in the cell
+            // above it, so the deck sits at the TOP of this tile — not
+            // centered — or the player would appear to float above it.
             g.fillStyle(0x123227, 1);
-            g.fillRect(4, TILE_SIZE / 2 - 18, TILE_SIZE - 8, 36);
+            g.fillRect(4, 0, TILE_SIZE - 8, 36);
             g.lineStyle(4, 0x39ff14, 1);
-            g.strokeRect(4, TILE_SIZE / 2 - 18, TILE_SIZE - 8, 36);
+            g.strokeRect(4, 0, TILE_SIZE - 8, 36);
             g.fillStyle(0x39ff14, 1);
-            g.fillRect(14, TILE_SIZE / 2 - 4, TILE_SIZE - 28, 6);
+            g.fillRect(14, 14, TILE_SIZE - 28, 6);
             g.generateTexture('platform', TILE_SIZE, TILE_SIZE);
             g.clear();
 
-            // One-way catwalk floor (solid; drop through with Down)
+            // One-way catwalk floor (solid; drop through with Down). Same
+            // deal as the moving platform: the walkable surface has to sit
+            // at the TOP of this tile, flush with the cell the player
+            // actually stands in above it.
             g.fillStyle(0x0c2b2e, 1);
-            g.fillRect(0, TILE_SIZE - 26, TILE_SIZE, 26);
+            g.fillRect(0, 0, TILE_SIZE, 26);
             for (let sx = 0; sx < TILE_SIZE; sx += 20) {
                 g.fillStyle(0x00e5c8, 0.6);
-                g.fillTriangle(sx, TILE_SIZE - 6, sx + 10, TILE_SIZE - 20, sx + 20, TILE_SIZE - 6);
+                g.fillTriangle(sx, 20, sx + 10, 6, sx + 20, 20);
             }
             g.generateTexture('oneway', TILE_SIZE, TILE_SIZE);
             g.clear();
