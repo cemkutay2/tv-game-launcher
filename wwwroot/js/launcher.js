@@ -32,6 +32,17 @@ window.appLauncher = {
         });
     },
 
+    // Called from the native host when the TV remote's back button is
+    // pressed. Gives the active game a chance to handle it itself (e.g.
+    // open its pause menu) before falling back to exiting to the grid.
+    handleBackButton: function() {
+        const game = window.appLauncher.activeGame;
+        if (game && typeof game.handleBackButton === 'function') {
+            return !!game.handleBackButton();
+        }
+        return false;
+    },
+
     exitGame: function() {
         console.log("Exiting game...");
         if (window.appLauncher.activeGame) {
