@@ -34,6 +34,48 @@
             background: #333; color: white; border: 1px solid #555; padding: 6px 12px;
             border-radius: 4px; cursor: pointer;
         }
+        #import-bar {
+            width: 900px;
+            max-width: 95vw;
+            margin-bottom: 14px;
+            background: #1e1e1e;
+            padding: 12px;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        #import-bar textarea {
+            width: 100%;
+            height: 90px;
+            background: #111;
+            color: #00ffaa;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 8px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        .import-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .import-actions button {
+            background-color: #00f3ff;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .import-actions button:hover {
+            background-color: #00c3cc;
+        }
+        #import-status.success { color: #00ffaa; }
+        #import-status.error { color: #ff6b6b; }
         #toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -161,6 +203,14 @@
         (keys/doors/teleporters) or a direction (carts/platforms) show extra pickers when selected.
         Export emits one level object in the format <code>game.js</code>'s <code>LEVELS</code> array expects —
         paste it in directly as a new array entry.</p>
+
+    <div id="import-bar">
+        <textarea id="import-input" placeholder="Paste a level object here — e.g. one entry copied out of game.js's LEVELS array (a trailing comma is fine) — then click Load to edit it visually."></textarea>
+        <div class="import-actions">
+            <button id="import-btn">Load into Editor</button>
+            <span id="import-status"></span>
+        </div>
+    </div>
 
     <div id="size-bar">
         <label>Width <input type="number" id="width-input" value="22" min="8" max="60"></label>
@@ -379,6 +429,123 @@
         document.addEventListener('mouseup', () => isMouseDown = false);
 
         // ---- resize -------------------------------------------------------
+        // ---- import -------------------------------------------------------
+        // Most levels in game.js build their `terrain` with these helpers
+        // rather than writing padded strings by hand — mirrored here
+        // (verbatim) so a level entry copied straight out of the LEVELS
+        // array evaluates the same way it does there.
+        function bordered(width, interiorRows) {
+            const rows = ['W'.repeat(width)];
+            for (const r of interiorRows) rows.push('W' + r + 'W');
+            rows.push('W'.repeat(width));
+            return rows;
+        }
+        function rowWithWalls(interiorWidth, wallCols) {
+            const chars = new Array(interiorWidth).fill('.');
+            for (const c of wallCols) chars[c - 1] = 'W';
+            return chars.join('');
+        }
+        function oneWayRun(fromX, toX, y) {
+            const list = [];
+            for (let x = fromX; x <= toX; x++) list.push({ x, y });
+            return list;
+        }
+
+        // Pulls the first balanced {...} out of pasted text (so it doesn't
+        // matter whether the trailing comma or surrounding `LEVELS.push(...)`
+        // wrapper from a copy-paste is included), then evaluates it as a JS
+        // object literal — this is a local authoring tool, not something
+        // fed untrusted input, so `new Function` is fine here.
+        function extractObjectLiteral(text) {
+            const start = text.indexOf('{');
+            if (start === -1) throw new Error('no "{" found — paste the whole level object');
+            let depth = 0, inString = null, escaped = false;
+            for (let i = start; i < text.length; i++) {
+                const ch = text[i];
+                if (inString) {
+                    if (escaped) escaped = false;
+                    else if (ch === '\\') escaped = true;
+                    else if (ch === inString) inString = null;
+                    continue;
+                }
+                if (ch === '"' || ch === "'" || ch === '`') { inString = ch; continue; }
+                if (ch === '{') depth++;
+                else if (ch === '}') {
+                    depth--;
+                    if (depth === 0) return text.slice(start, i + 1);
+                }
+            }
+            throw new Error('unbalanced braces — the pasted object looks incomplete');
+        }
+
+        function setImportStatus(message, kind) {
+            const el = document.getElementById('import-status');
+            el.textContent = message;
+            el.className = kind || '';
+        }
+
+        function importLevel() {
+            const raw = document.getElementById('import-input').value;
+            if (!raw.trim()) {
+                setImportStatus('Paste a level object first.', 'error');
+                return;
+            }
+
+            let lvl;
+            try {
+                const objText = extractObjectLiteral(raw);
+                const build = new Function('bordered', 'rowWithWalls', 'oneWayRun', 'return (' + objText + ')');
+                lvl = build(bordered, rowWithWalls, oneWayRun);
+            } catch (err) {
+                setImportStatus('Could not parse that: ' + err.message, 'error');
+                return;
+            }
+
+            if (!lvl || !Array.isArray(lvl.terrain) || lvl.terrain.length === 0) {
+                setImportStatus('That doesn\'t look like a level object — missing "terrain".', 'error');
+                return;
+            }
+
+            const h = lvl.terrain.length;
+            const w = Math.max(...lvl.terrain.map(row => row.length));
+            const newTerrain = lvl.terrain.map(row => {
+                const chars = row.split('');
+                while (chars.length < w) chars.push('.');
+                return chars;
+            });
+
+            const newEntities = {};
+            const place = (type, x, y, extra) => {
+                if (x == null || y == null) return;
+                newEntities[x + ',' + y] = Object.assign({ type }, extra || {});
+            };
+            if (lvl.player) place('player', lvl.player.x, lvl.player.y);
+            if (lvl.exit) place('exit', lvl.exit.x, lvl.exit.y);
+            (lvl.luggage || []).forEach(e => place('luggage', e.x, e.y));
+            (lvl.keys || []).forEach(e => place('key', e.x, e.y, { id: e.id }));
+            (lvl.doors || []).forEach(e => place('door', e.x, e.y, { id: e.id }));
+            (lvl.carts || []).forEach(e => place('cart', e.x, e.y, { dir: e.dir }));
+            (lvl.platforms || []).forEach(e => place('platform', e.x, e.y, { axis: e.axis, dir: e.dir }));
+            (lvl.oneWays || []).forEach(e => place('oneway', e.x, e.y));
+            (lvl.teleporters || []).forEach(e => place('teleporter', e.x, e.y, { id: e.id }));
+            (lvl.checkpoints || []).forEach(e => place('checkpoint', e.x, e.y));
+
+            GRID_W = w;
+            GRID_H = h;
+            terrain = newTerrain;
+            entities = newEntities;
+
+            document.getElementById('name-input').value = lvl.name || 'New Floor';
+            document.getElementById('width-input').value = w;
+            document.getElementById('height-input').value = h;
+
+            rebuildGrid();
+            updateOutput();
+            setImportStatus(`Loaded "${lvl.name || 'level'}" (${w}x${h}) — edit it below.`, 'success');
+        }
+
+        document.getElementById('import-btn').addEventListener('click', importLevel);
+
         document.getElementById('resize-btn').addEventListener('click', () => {
             const w = Math.max(8, Math.min(60, parseInt(document.getElementById('width-input').value, 10) || GRID_W));
             const h = Math.max(7, Math.min(20, parseInt(document.getElementById('height-input').value, 10) || GRID_H));
