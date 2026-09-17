@@ -259,25 +259,31 @@ window.launchGame = function(containerId) {
                 music: 0xff006e       // Pink/Magenta (Music Tent/Concert Hall)
             };
 
+            // yieldMultiplier: stardust generated per occupied soul per tick.
+            // dwellMin/dwellMax: how long (ms) a soul stays before checking out.
+            // Tier 1 nodes step up in cost order: pricier unlocks pay off with
+            // both a higher yield and a faster (shorter) stay, so progression
+            // keeps feeling worthwhile instead of every rest node behaving the same.
             const normalNodes = [
                 { id: 'dock', type: 'dock', color: COLORS.dock, capacity: 5, current: [], unlocked: true, label: 'The Dock\n(Arrivals)' },
-                { id: 'campfire', type: 'rest', color: BRANCH_COLORS.fire, capacity: 3, current: [], unlocked: true, label: 'Campfire\n(Rest)' },
-                { id: 'cabin', type: 'rest', color: BRANCH_COLORS.wood, capacity: 4, current: [], unlocked: false, label: 'Cabin\n(Unlock: 50)', unlockCost: 50 },
-                { id: 'hammock', type: 'rest', color: BRANCH_COLORS.nature, capacity: 3, current: [], unlocked: false, label: 'Hammocks\n(Unlock: 120)', unlockCost: 120 },
-                { id: 'observatory', type: 'rest', color: BRANCH_COLORS.space, capacity: 2, current: [], unlocked: false, label: 'Observatory\n(Unlock: 250)', unlockCost: 250 },
-                { id: 'hotspring', type: 'rest', color: BRANCH_COLORS.water, capacity: 5, current: [], unlocked: false, label: 'Hot Springs\n(Unlock: 400)', unlockCost: 400 },
-                { id: 'teagarden', type: 'rest', color: BRANCH_COLORS.tea, capacity: 3, current: [], unlocked: false, label: 'Tea Garden\n(Unlock: 600)', unlockCost: 600 },
-                { id: 'library', type: 'rest', color: BRANCH_COLORS.books, capacity: 2, current: [], unlocked: false, label: 'Library\n(Unlock: 900)', unlockCost: 900 },
-                { id: 'musictent', type: 'rest', color: BRANCH_COLORS.music, capacity: 4, current: [], unlocked: false, label: 'Music Tent\n(Unlock: 1300)', unlockCost: 1300 },
-                // Tier 2 (Revealed when parent is unlocked)
-                { id: 'bonfire', parentId: 'campfire', type: 'rest', color: BRANCH_COLORS.fire, capacity: 5, current: [], unlocked: false, hidden: true, label: 'Bonfire\n(Unlock: 800)', unlockCost: 800 },
-                { id: 'lodge', parentId: 'cabin', type: 'rest', color: BRANCH_COLORS.wood, capacity: 6, current: [], unlocked: false, hidden: true, label: 'Grand Lodge\n(Unlock: 1500)', unlockCost: 1500 },
-                { id: 'treehouse', parentId: 'hammock', type: 'rest', color: BRANCH_COLORS.nature, capacity: 4, current: [], unlocked: false, hidden: true, label: 'Treehouse\n(Unlock: 2200)', unlockCost: 2200 },
-                { id: 'planetarium', parentId: 'observatory', type: 'rest', color: BRANCH_COLORS.space, capacity: 3, current: [], unlocked: false, hidden: true, label: 'Planetarium\n(Unlock: 3500)', unlockCost: 3500 },
-                { id: 'spa', parentId: 'hotspring', type: 'rest', color: BRANCH_COLORS.water, capacity: 8, current: [], unlocked: false, hidden: true, label: 'Luxury Spa\n(Unlock: 5000)', unlockCost: 5000 },
-                { id: 'cafe', parentId: 'teagarden', type: 'rest', color: BRANCH_COLORS.tea, capacity: 5, current: [], unlocked: false, hidden: true, label: 'Sky Cafe\n(Unlock: 7500)', unlockCost: 7500 },
-                { id: 'archives', parentId: 'library', type: 'rest', color: BRANCH_COLORS.books, capacity: 3, current: [], unlocked: false, hidden: true, label: 'Great Archives\n(Unlock: 10000)', unlockCost: 10000 },
-                { id: 'concerthall', parentId: 'musictent', type: 'rest', color: BRANCH_COLORS.music, capacity: 6, current: [], unlocked: false, hidden: true, label: 'Concert Hall\n(Unlock: 15000)', unlockCost: 15000 }
+                { id: 'campfire', type: 'rest', color: BRANCH_COLORS.fire, capacity: 3, current: [], unlocked: true, label: 'Campfire\n(Rest)', yieldMultiplier: 1.00, dwellMin: 30000, dwellMax: 45000 },
+                { id: 'cabin', type: 'rest', color: BRANCH_COLORS.wood, capacity: 4, current: [], unlocked: false, label: 'Cabin\n(Unlock: 50)', unlockCost: 50, yieldMultiplier: 1.15, dwellMin: 28000, dwellMax: 43000 },
+                { id: 'hammock', type: 'rest', color: BRANCH_COLORS.nature, capacity: 3, current: [], unlocked: false, label: 'Hammocks\n(Unlock: 120)', unlockCost: 120, yieldMultiplier: 1.30, dwellMin: 26000, dwellMax: 41000 },
+                { id: 'observatory', type: 'rest', color: BRANCH_COLORS.space, capacity: 2, current: [], unlocked: false, label: 'Observatory\n(Unlock: 250)', unlockCost: 250, yieldMultiplier: 1.45, dwellMin: 24000, dwellMax: 39000 },
+                { id: 'hotspring', type: 'rest', color: BRANCH_COLORS.water, capacity: 5, current: [], unlocked: false, label: 'Hot Springs\n(Unlock: 400)', unlockCost: 400, yieldMultiplier: 1.60, dwellMin: 22000, dwellMax: 37000 },
+                { id: 'teagarden', type: 'rest', color: BRANCH_COLORS.tea, capacity: 3, current: [], unlocked: false, label: 'Tea Garden\n(Unlock: 600)', unlockCost: 600, yieldMultiplier: 1.75, dwellMin: 20000, dwellMax: 35000 },
+                { id: 'library', type: 'rest', color: BRANCH_COLORS.books, capacity: 2, current: [], unlocked: false, label: 'Library\n(Unlock: 900)', unlockCost: 900, yieldMultiplier: 1.90, dwellMin: 18000, dwellMax: 33000 },
+                { id: 'musictent', type: 'rest', color: BRANCH_COLORS.music, capacity: 4, current: [], unlocked: false, label: 'Music Tent\n(Unlock: 1300)', unlockCost: 1300, yieldMultiplier: 2.05, dwellMin: 16000, dwellMax: 31000 },
+                // Tier 2 (Revealed when parent is unlocked) — same +0.15x yield / -2s dwell
+                // step per unlock-cost rank as Tier 1, starting from the old flat 3x/60-90s baseline.
+                { id: 'bonfire', parentId: 'campfire', type: 'rest', color: BRANCH_COLORS.fire, capacity: 5, current: [], unlocked: false, hidden: true, label: 'Bonfire\n(Unlock: 800)', unlockCost: 800, yieldMultiplier: 3.00, dwellMin: 60000, dwellMax: 90000 },
+                { id: 'lodge', parentId: 'cabin', type: 'rest', color: BRANCH_COLORS.wood, capacity: 6, current: [], unlocked: false, hidden: true, label: 'Grand Lodge\n(Unlock: 1500)', unlockCost: 1500, yieldMultiplier: 3.15, dwellMin: 58000, dwellMax: 88000 },
+                { id: 'treehouse', parentId: 'hammock', type: 'rest', color: BRANCH_COLORS.nature, capacity: 4, current: [], unlocked: false, hidden: true, label: 'Treehouse\n(Unlock: 2200)', unlockCost: 2200, yieldMultiplier: 3.30, dwellMin: 56000, dwellMax: 86000 },
+                { id: 'planetarium', parentId: 'observatory', type: 'rest', color: BRANCH_COLORS.space, capacity: 3, current: [], unlocked: false, hidden: true, label: 'Planetarium\n(Unlock: 3500)', unlockCost: 3500, yieldMultiplier: 3.45, dwellMin: 54000, dwellMax: 84000 },
+                { id: 'spa', parentId: 'hotspring', type: 'rest', color: BRANCH_COLORS.water, capacity: 8, current: [], unlocked: false, hidden: true, label: 'Luxury Spa\n(Unlock: 5000)', unlockCost: 5000, yieldMultiplier: 3.60, dwellMin: 52000, dwellMax: 82000 },
+                { id: 'cafe', parentId: 'teagarden', type: 'rest', color: BRANCH_COLORS.tea, capacity: 5, current: [], unlocked: false, hidden: true, label: 'Sky Cafe\n(Unlock: 7500)', unlockCost: 7500, yieldMultiplier: 3.75, dwellMin: 50000, dwellMax: 80000 },
+                { id: 'archives', parentId: 'library', type: 'rest', color: BRANCH_COLORS.books, capacity: 3, current: [], unlocked: false, hidden: true, label: 'Great Archives\n(Unlock: 10000)', unlockCost: 10000, yieldMultiplier: 3.90, dwellMin: 48000, dwellMax: 78000 },
+                { id: 'concerthall', parentId: 'musictent', type: 'rest', color: BRANCH_COLORS.music, capacity: 6, current: [], unlocked: false, hidden: true, label: 'Concert Hall\n(Unlock: 15000)', unlockCost: 15000, yieldMultiplier: 4.05, dwellMin: 46000, dwellMax: 76000 }
             ];
 
             this.nodes = [];
@@ -936,12 +942,7 @@ window.launchGame = function(containerId) {
                         const ox = Phaser.Math.Between(-80, 80);
                         const oy = Phaser.Math.Between(-15, 15);
                         
-                        // Add checkout time (30 - 45s for Tier 1, 60 - 90s for Tier 2)
-                        if (node.parentId) {
-                            t.checkOutTime = this.time.now + Phaser.Math.Between(60000, 90000);
-                        } else {
-                            t.checkOutTime = this.time.now + Phaser.Math.Between(30000, 45000);
-                        }
+                        t.checkOutTime = this.time.now + Phaser.Math.Between(node.dwellMin, node.dwellMax);
                         
                         this.tweens.killTweensOf(t);
                         
@@ -1090,8 +1091,7 @@ window.launchGame = function(containerId) {
             let generated = 0;
             this.nodes.forEach(node => {
                 if (node.type === 'rest' && node.unlocked) {
-                    const multiplier = node.parentId ? 3 : 1;
-                    generated += (node.current.length * multiplier);
+                    generated += (node.current.length * node.yieldMultiplier);
                     
                     node.current.forEach(t => {
                         const visualChance = node.parentId ? 0.7 : 0.3; // Show lots more stars for tier 2!
@@ -1129,7 +1129,8 @@ window.launchGame = function(containerId) {
             });
             
             if (generated > 0) {
-                this.stardust += generated;
+                // yieldMultiplier can be fractional (progression bonus), round the tick total to keep the counter an integer.
+                this.stardust += Math.round(generated);
                 this.updateStardustText();
             }
         }
@@ -1547,11 +1548,7 @@ window.launchGame = function(containerId) {
                         const t = dock.current.shift();
                         
                         targetNode.current.push(t);
-                        if (targetNode.parentId) {
-                            t.checkOutTime = time + Phaser.Math.Between(60000, 90000);
-                        } else {
-                            t.checkOutTime = time + Phaser.Math.Between(30000, 45000);
-                        }
+                        t.checkOutTime = time + Phaser.Math.Between(targetNode.dwellMin, targetNode.dwellMax);
                         
                         const ox = Phaser.Math.Between(-80, 80);
                         const oy = Phaser.Math.Between(-15, 15);
