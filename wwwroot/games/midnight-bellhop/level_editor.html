@@ -19,26 +19,44 @@
             margin-top: 0;
             color: #00f3ff;
         }
-        #toolbar {
+        p.note { color: #aaa; max-width: 800px; text-align: center; margin-top: -8px; }
+        #size-bar {
             display: flex;
             gap: 10px;
-            margin-bottom: 20px;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        #size-bar input {
+            width: 60px;
+            padding: 4px;
+        }
+        #size-bar button {
+            background: #333; color: white; border: 1px solid #555; padding: 6px 12px;
+            border-radius: 4px; cursor: pointer;
+        }
+        #toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
             background: #1e1e1e;
-            padding: 15px;
+            padding: 12px;
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            max-width: 1000px;
         }
         .tool-btn {
             background-color: #333;
             color: white;
             border: 2px solid transparent;
-            padding: 8px 12px;
+            padding: 6px 10px;
             cursor: pointer;
             border-radius: 4px;
             font-weight: bold;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
         .tool-btn:hover {
             background-color: #444;
@@ -48,53 +66,76 @@
             background-color: #222;
         }
         .tool-preview {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 11px;
             color: black;
             border: 1px solid #000;
+            flex-shrink: 0;
         }
+        #id-bar, #dir-bar {
+            display: none;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 14px;
+            background: #1e1e1e;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+        #id-bar.show, #dir-bar.show { display: flex; }
+        #id-bar button, #dir-bar button {
+            background: #333; color: white; border: 2px solid transparent; padding: 4px 10px;
+            border-radius: 4px; cursor: pointer;
+        }
+        #id-bar button.active, #dir-bar button.active { border-color: #00f3ff; }
         #canvas-container {
             user-select: none;
             background-color: #140809;
             border: 4px solid #471d21;
             cursor: crosshair;
+            overflow: auto;
+            max-width: 100%;
         }
         .row {
             display: flex;
         }
         .cell {
-            width: 50px;
-            height: 50px;
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
             box-sizing: border-box;
             border: 1px solid #333;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 11px;
             font-weight: bold;
+            position: relative;
         }
         .cell:hover {
-            border-color: #fff;
+            outline: 2px solid #fff;
             z-index: 10;
         }
         #output-container {
             margin-top: 20px;
-            width: 800px;
+            width: 900px;
+            max-width: 95vw;
         }
         textarea {
             width: 100%;
-            height: 200px;
+            height: 260px;
             background: #1e1e1e;
             color: #00ffaa;
             font-family: monospace;
+            font-size: 12px;
             padding: 10px;
             border: 1px solid #555;
             border-radius: 4px;
-            resize: none;
+            resize: vertical;
+            box-sizing: border-box;
         }
         .export-btn {
             background-color: #00f3ff;
@@ -116,117 +157,293 @@
 <body>
 
     <h1>Midnight Bellhop Level Editor</h1>
+    <p class="note">Paint terrain (Wall / Floor) then drop entities on top. Systems that need an id
+        (keys/doors/teleporters) or a direction (carts/platforms) show extra pickers when selected.
+        Export emits one level object in the format <code>game.js</code>'s <code>LEVELS</code> array expects —
+        paste it in directly as a new array entry.</p>
 
-    <div id="toolbar">
-        <button class="tool-btn active" data-char="W">
-            <div class="tool-preview" style="background-color: #4a2529;"></div> W (Wall)
-        </button>
-        <button class="tool-btn" data-char=".">
-            <div class="tool-preview" style="background-color: #140809; border-color:#555"></div> . (Empty)
-        </button>
-        <button class="tool-btn" data-char="P">
-            <div class="tool-preview" style="background-color: #00f3ff;"></div> P (Player)
-        </button>
-        <button class="tool-btn" data-char="E">
-            <div class="tool-preview" style="background-color: #00ffaa;"></div> E (Elevator)
-        </button>
-        <button class="tool-btn" data-char="L">
-            <div class="tool-preview" style="background-color: #ffd700;"></div> L (Luggage)
-        </button>
-        <button class="tool-btn" data-char="<">
-            <div class="tool-preview" style="background-color: #ff003c; color: white"><</div> < (Cart Left)
-        </button>
-        <button class="tool-btn" data-char=">">
-            <div class="tool-preview" style="background-color: #ff003c; color: white">></div> > (Cart Right)
-        </button>
+    <div id="size-bar">
+        <label>Width <input type="number" id="width-input" value="22" min="8" max="60"></label>
+        <label>Height <input type="number" id="height-input" value="9" min="7" max="20"></label>
+        <button id="resize-btn">Resize (keeps top-left content)</button>
+        <label>Name <input type="text" id="name-input" value="New Floor" style="width:160px"></label>
     </div>
+
+    <div id="toolbar"></div>
+    <div id="id-bar"></div>
+    <div id="dir-bar"></div>
 
     <div id="canvas-container"></div>
 
     <div id="output-container">
-        <h3>Generated Level Code (Paste into game.js)</h3>
+        <h3>Generated Level Object (paste into game.js's LEVELS array)</h3>
         <textarea id="output" readonly></textarea>
         <button class="export-btn" id="copy-btn">Copy to Clipboard</button>
     </div>
 
     <script>
-        const GRID_W = 16;
-        const GRID_H = 9;
-        let currentTool = 'W';
+        // ---- tool palette -------------------------------------------------
+        // Terrain tools paint the base grid; entity tools drop/remove a single
+        // marker on a cell (only one entity per cell). This mirrors game.js's
+        // terrain + entity-list level format.
+        const TOOLS = [
+            { key: 'wall', label: 'Wall', kind: 'terrain', bg: '#4a2529', text: '' },
+            { key: 'floor', label: 'Floor', kind: 'terrain', bg: '#140809', text: '', border: '#555' },
+            { key: 'player', label: 'Player', kind: 'entity', bg: '#140809', text: 'P', color: '#00f3ff' },
+            { key: 'exit', label: 'Exit', kind: 'entity', bg: '#140809', text: 'E', color: '#00ffaa' },
+            { key: 'luggage', label: 'Luggage', kind: 'entity', bg: '#140809', text: 'L', color: '#ffd700' },
+            { key: 'cart', label: 'Cart', kind: 'entity', bg: '#140809', text: 'C', color: '#ff003c', needsDir: true },
+            { key: 'key', label: 'Key', kind: 'entity', bg: '#140809', text: 'K', color: '#b388ff', needsId: true },
+            { key: 'door', label: 'Door', kind: 'entity', bg: '#140809', text: 'D', color: '#ffa726', needsId: true },
+            { key: 'platform', label: 'Platform', kind: 'entity', bg: '#140809', text: 'M', color: '#39ff14', needsAxisDir: true },
+            { key: 'oneway', label: 'One-Way', kind: 'entity', bg: '#140809', text: 'O', color: '#00e5c8' },
+            { key: 'teleporter', label: 'Warp', kind: 'entity', bg: '#140809', text: 'T', color: '#40e0ff', needsId: true },
+            { key: 'checkpoint', label: 'Checkpoint', kind: 'entity', bg: '#140809', text: 'X', color: '#00ffaa' },
+        ];
+        const TOOL_BY_KEY = Object.fromEntries(TOOLS.map(t => [t.key, t]));
+
+        let GRID_W = 22, GRID_H = 9;
+        let currentTool = 'wall';
+        let currentId = 1;
+        let currentDir = 1; // 1 or -1
+        let currentAxis = 'h'; // 'h' or 'v'
         let isMouseDown = false;
+        let paintValue = null; // what mousedown is painting/erasing, decided per-drag
 
-        const colors = {
-            'W': { bg: '#4a2529', text: '' },
-            '.': { bg: '#140809', text: '' },
-            'P': { bg: '#140809', text: 'P', color: '#00f3ff' },
-            'E': { bg: '#140809', text: 'E', color: '#00ffaa' },
-            'L': { bg: '#140809', text: 'L', color: '#ffd700' },
-            '<': { bg: '#140809', text: '<', color: '#ff003c' },
-            '>': { bg: '#140809', text: '>', color: '#ff003c' }
-        };
+        let terrain = [];   // terrain[y][x] = 'W' | '.'
+        let entities = {};  // "x,y" -> { type, id?, dir?, axis? }
 
-        const grid = Array.from({ length: GRID_H }, () => Array(GRID_W).fill('.'));
+        function makeEmptyTerrain(w, h) {
+            const grid = Array.from({ length: h }, () => Array(w).fill('.'));
+            for (let x = 0; x < w; x++) { grid[0][x] = 'W'; grid[h - 1][x] = 'W'; }
+            for (let y = 0; y < h; y++) { grid[y][0] = 'W'; grid[y][w - 1] = 'W'; }
+            return grid;
+        }
+        terrain = makeEmptyTerrain(GRID_W, GRID_H);
 
-        // Init border walls
-        for (let x = 0; x < GRID_W; x++) { grid[0][x] = 'W'; grid[GRID_H-1][x] = 'W'; }
-        for (let y = 0; y < GRID_H; y++) { grid[y][0] = 'W'; grid[y][GRID_W-1] = 'W'; }
+        // ---- toolbar --------------------------------------------------
+        const toolbar = document.getElementById('toolbar');
+        TOOLS.forEach(t => {
+            const btn = document.createElement('button');
+            btn.className = 'tool-btn' + (t.key === currentTool ? ' active' : '');
+            btn.dataset.key = t.key;
+            const preview = document.createElement('div');
+            preview.className = 'tool-preview';
+            preview.style.backgroundColor = t.bg;
+            preview.style.color = t.color || 'black';
+            if (t.border) preview.style.borderColor = t.border;
+            preview.textContent = t.text;
+            btn.appendChild(preview);
+            btn.appendChild(document.createTextNode(t.label));
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTool = t.key;
+                updatePickers();
+            });
+            toolbar.appendChild(btn);
+        });
 
+        const idBar = document.getElementById('id-bar');
+        const dirBar = document.getElementById('dir-bar');
+
+        function updatePickers() {
+            const t = TOOL_BY_KEY[currentTool];
+            idBar.classList.toggle('show', !!(t.needsId));
+            dirBar.classList.toggle('show', !!(t.needsDir || t.needsAxisDir));
+            if (t.needsId) buildIdBar();
+            if (t.needsDir) buildDirBar(['Left', 'Right'], [-1, 1]);
+            if (t.needsAxisDir) buildAxisDirBar();
+        }
+        function buildIdBar() {
+            idBar.innerHTML = '';
+            [1, 2, 3].forEach(id => {
+                const b = document.createElement('button');
+                b.textContent = 'ID ' + id;
+                if (id === currentId) b.classList.add('active');
+                b.addEventListener('click', () => { currentId = id; buildIdBar(); });
+                idBar.appendChild(b);
+            });
+        }
+        function buildDirBar(labels, values) {
+            dirBar.innerHTML = '';
+            labels.forEach((label, i) => {
+                const b = document.createElement('button');
+                b.textContent = label;
+                if (values[i] === currentDir) b.classList.add('active');
+                b.addEventListener('click', () => { currentDir = values[i]; buildDirBar(labels, values); });
+                dirBar.appendChild(b);
+            });
+        }
+        function buildAxisDirBar() {
+            dirBar.innerHTML = '';
+            const opts = [
+                { label: 'Horizontal →', axis: 'h', dir: 1 },
+                { label: 'Horizontal ←', axis: 'h', dir: -1 },
+                { label: 'Vertical ↓', axis: 'v', dir: 1 },
+                { label: 'Vertical ↑', axis: 'v', dir: -1 },
+            ];
+            opts.forEach(o => {
+                const b = document.createElement('button');
+                b.textContent = o.label;
+                if (o.axis === currentAxis && o.dir === currentDir) b.classList.add('active');
+                b.addEventListener('click', () => { currentAxis = o.axis; currentDir = o.dir; buildAxisDirBar(); });
+                dirBar.appendChild(b);
+            });
+        }
+        updatePickers();
+
+        // ---- grid -------------------------------------------------------
         const container = document.getElementById('canvas-container');
-        
-        function renderCell(x, y, cellDiv) {
-            const char = grid[y][x];
-            cellDiv.style.backgroundColor = colors[char].bg;
-            cellDiv.textContent = colors[char].text;
-            cellDiv.style.color = colors[char].color || 'black';
+        let cellDivs = [];
+
+        function entityGlyph(x, y) {
+            const e = entities[x + ',' + y];
+            if (!e) return null;
+            const t = TOOL_BY_KEY[e.type];
+            let label = t.text;
+            if (e.id) label += e.id;
+            return { text: label, color: t.color };
         }
 
-        function paint(x, y, cellDiv) {
-            if (grid[y][x] !== currentTool) {
-                grid[y][x] = currentTool;
-                renderCell(x, y, cellDiv);
-                updateOutput();
+        function renderCell(x, y) {
+            const cellDiv = cellDivs[y][x];
+            const isWall = terrain[y][x] === 'W';
+            cellDiv.style.backgroundColor = isWall ? TOOL_BY_KEY.wall.bg : TOOL_BY_KEY.floor.bg;
+            const glyph = entityGlyph(x, y);
+            if (glyph) {
+                cellDiv.textContent = glyph.text;
+                cellDiv.style.color = glyph.color;
+            } else {
+                cellDiv.textContent = '';
             }
         }
 
-        // Build grid
-        for (let y = 0; y < GRID_H; y++) {
-            const row = document.createElement('div');
-            row.className = 'row';
-            for (let x = 0; x < GRID_W; x++) {
-                const cell = document.createElement('div');
-                cell.className = 'cell';
-                renderCell(x, y, cell);
-                
-                cell.addEventListener('mousedown', (e) => {
-                    isMouseDown = true;
-                    paint(x, y, cell);
-                });
-                cell.addEventListener('mouseenter', (e) => {
-                    if (isMouseDown) paint(x, y, cell);
-                });
-                row.appendChild(cell);
+        function rebuildGrid() {
+            container.innerHTML = '';
+            cellDivs = [];
+            for (let y = 0; y < GRID_H; y++) {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                const rowCells = [];
+                for (let x = 0; x < GRID_W; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.addEventListener('mousedown', () => {
+                        isMouseDown = true;
+                        paintValue = decidePaintValue(x, y);
+                        applyPaint(x, y);
+                    });
+                    cell.addEventListener('mouseenter', () => {
+                        if (isMouseDown) applyPaint(x, y);
+                    });
+                    rowDiv.appendChild(cell);
+                    rowCells.push(cell);
+                }
+                container.appendChild(rowDiv);
+                cellDivs.push(rowCells);
             }
-            container.appendChild(row);
+            for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) renderCell(x, y);
+        }
+
+        function decidePaintValue(x, y) {
+            const t = TOOL_BY_KEY[currentTool];
+            if (t.kind === 'terrain') {
+                const target = currentTool === 'wall' ? 'W' : '.';
+                return terrain[y][x] === target ? 'erase' : 'paint';
+            }
+            const existing = entities[x + ',' + y];
+            const isSame = existing && existing.type === currentTool;
+            return isSame ? 'erase' : 'paint';
+        }
+
+        function applyPaint(x, y) {
+            const t = TOOL_BY_KEY[currentTool];
+            if (t.kind === 'terrain') {
+                terrain[y][x] = (paintValue === 'erase') ? '.' : (currentTool === 'wall' ? 'W' : '.');
+            } else {
+                if (paintValue === 'erase') {
+                    delete entities[x + ',' + y];
+                } else {
+                    const e = { type: currentTool };
+                    if (t.needsId) e.id = currentId;
+                    if (t.needsDir) e.dir = currentDir;
+                    if (t.needsAxisDir) { e.axis = currentAxis; e.dir = currentDir; }
+                    entities[x + ',' + y] = e;
+                }
+            }
+            renderCell(x, y);
+            updateOutput();
         }
 
         document.addEventListener('mouseup', () => isMouseDown = false);
 
-        // Tool selection
-        document.querySelectorAll('.tool-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentTool = btn.dataset.char;
-            });
+        // ---- resize -------------------------------------------------------
+        document.getElementById('resize-btn').addEventListener('click', () => {
+            const w = Math.max(8, Math.min(60, parseInt(document.getElementById('width-input').value, 10) || GRID_W));
+            const h = Math.max(7, Math.min(20, parseInt(document.getElementById('height-input').value, 10) || GRID_H));
+            const newTerrain = makeEmptyTerrain(w, h);
+            for (let y = 0; y < Math.min(h, GRID_H); y++) {
+                for (let x = 0; x < Math.min(w, GRID_W); x++) newTerrain[y][x] = terrain[y][x];
+            }
+            const newEntities = {};
+            for (const [key, e] of Object.entries(entities)) {
+                const [ex, ey] = key.split(',').map(Number);
+                if (ex < w && ey < h) newEntities[key] = e;
+            }
+            terrain = newTerrain;
+            entities = newEntities;
+            GRID_W = w; GRID_H = h;
+            rebuildGrid();
+            updateOutput();
         });
 
+        // ---- export -------------------------------------------------------
+        function jsStr(s) { return "'" + String(s).replace(/'/g, "\\'") + "'"; }
+
         function updateOutput() {
-            let result = "[\n";
-            for (let y = 0; y < GRID_H; y++) {
-                result += `    "${grid[y].join('')}"${y < GRID_H - 1 ? ',' : ''}\n`;
-            }
-            result += "]";
-            document.getElementById('output').value = result;
+            const name = document.getElementById('name-input').value || 'New Floor';
+            const rows = terrain.map(r => r.join(''));
+
+            const byType = {};
+            for (const e of Object.values(entities)) (byType[e.type] = byType[e.type] || []).push(e);
+            // recover x,y per entity (entities object keys hold coords)
+            const withCoords = Object.entries(entities).map(([key, e]) => {
+                const [x, y] = key.split(',').map(Number);
+                return { ...e, x, y };
+            });
+            const of = (type) => withCoords.filter(e => e.type === type);
+            const players = of('player'), exits = of('exit');
+
+            let out = '{\n';
+            out += `    name: ${jsStr(name)},\n`;
+            out += '    terrain: [\n';
+            for (const r of rows) out += `        ${jsStr(r)},\n`;
+            out += '    ],\n';
+            if (players[0]) out += `    player: { x: ${players[0].x}, y: ${players[0].y} },\n`;
+            else out += '    player: { x: 1, y: 1 }, // WARNING: no Player placed\n';
+            if (exits[0]) out += `    exit: { x: ${exits[0].x}, y: ${exits[0].y} },\n`;
+            else out += '    exit: { x: 1, y: 1 }, // WARNING: no Exit placed\n';
+
+            const fmtList = (list, fmtItem) => list.length ? `[${list.map(fmtItem).join(', ')}]` : '[]';
+
+            out += `    luggage: ${fmtList(of('luggage'), e => `{ x: ${e.x}, y: ${e.y} }`)},\n`;
+            const keys = of('key'), doors = of('door');
+            if (keys.length) out += `    keys: ${fmtList(keys, e => `{ id: ${e.id}, x: ${e.x}, y: ${e.y} }`)},\n`;
+            if (doors.length) out += `    doors: ${fmtList(doors, e => `{ id: ${e.id}, x: ${e.x}, y: ${e.y} }`)},\n`;
+            const carts = of('cart');
+            if (carts.length) out += `    carts: ${fmtList(carts, e => `{ x: ${e.x}, y: ${e.y}, dir: ${e.dir} }`)},\n`;
+            const platforms = of('platform');
+            if (platforms.length) out += `    platforms: ${fmtList(platforms, e => `{ x: ${e.x}, y: ${e.y}, axis: ${jsStr(e.axis)}, dir: ${e.dir} }`)},\n`;
+            const oneWays = of('oneway');
+            if (oneWays.length) out += `    oneWays: ${fmtList(oneWays, e => `{ x: ${e.x}, y: ${e.y} }`)},\n`;
+            const teleporters = of('teleporter');
+            if (teleporters.length) out += `    teleporters: ${fmtList(teleporters, e => `{ id: ${e.id}, x: ${e.x}, y: ${e.y} }`)},\n`;
+            const checkpoints = of('checkpoint');
+            if (checkpoints.length) out += `    checkpoints: ${fmtList(checkpoints, e => `{ x: ${e.x}, y: ${e.y} }`)},\n`;
+            out += '},';
+
+            document.getElementById('output').value = out;
         }
 
         document.getElementById('copy-btn').addEventListener('click', () => {
@@ -234,10 +451,12 @@
             textarea.select();
             document.execCommand('copy');
             const btn = document.getElementById('copy-btn');
-            btn.textContent = "Copied!";
-            setTimeout(() => btn.textContent = "Copy to Clipboard", 2000);
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = 'Copy to Clipboard', 2000);
         });
+        document.getElementById('name-input').addEventListener('input', updateOutput);
 
+        rebuildGrid();
         updateOutput();
     </script>
 </body>
