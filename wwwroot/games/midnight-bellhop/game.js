@@ -517,8 +517,25 @@ window.launchGame = function(containerId) {
             return this.isSolid(x, y + 1);
         }
 
+        // Like isSolid, but a one-way floor never blocks movement INTO its cell —
+        // it only holds you up if you're already standing on it from above
+        // (isGrounded still treats it as solid). Without this split, a catwalk
+        // overhead makes every jump underneath it a no-op across its whole span,
+        // since the jump target is always "solid". A jump into a one-way tile
+        // from below still won't let you rest there — isGrounded fails the next
+        // tick and you fall straight back — this just stops it from eating the
+        // input entirely.
         canMove(x, y) {
-            return !this.isSolid(x, y);
+            if (x < 0 || x >= this.gridW || y < 0 || y >= this.gridH) return false;
+            const key = x + ',' + y;
+            if (this.wallSet.has(key)) return false;
+            for (const d of this.doors) {
+                if (!d.open && d.x === x && d.y === y) return false;
+            }
+            for (const p of this.platforms) {
+                if (p.gridX === x && p.gridY === y) return false;
+            }
+            return true;
         }
 
         moveTo(newX, newY, type) {
