@@ -1584,5 +1584,32 @@ window.launchGame = function(containerId) {
         scene: [MainScene]
     };
 
-    return new Phaser.Game(config);
+    const game = new Phaser.Game(config);
+
+    // Called by the launcher when the TV remote's hardware back button is
+    // pressed (that event never reaches Phaser's own keyboard input — the
+    // host app intercepts it natively before it can become a DOM keydown).
+    // Mirrors the in-game ESC/BACKSPACE handling in MainScene.handleInput.
+    // Returns true if the game consumed it (opened/closed the pause menu,
+    // or dismissed ambient mode), false to let the launcher exit to the grid.
+    game.handleBackButton = function() {
+        const scene = game.scene.getScene('MainScene');
+        if (!scene) return false;
+
+        if (scene.gameState === 'menu') return false; // let launcher exit to grid
+
+        if (scene.gameState === 'pause') {
+            scene.startGame(); // Resume
+            return true;
+        }
+
+        if (scene.isAmbient) {
+            scene.exitAmbientMode();
+        } else {
+            scene.pauseGame();
+        }
+        return true;
+    };
+
+    return game;
 };
