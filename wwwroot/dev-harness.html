@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Game Test Harness</title>
+    <link rel="stylesheet" href="app.css" />
+    <link rel="icon" href="data:,">
+    <style>
+        /* Harness-only chrome, kept out of app.css so it can't leak into the real launcher. */
+        .harness-badge {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #0f172a;
+            background: #fbbf24;
+            border-radius: 999px;
+            z-index: 1000;
+        }
+        .harness-back-btn {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            padding: 10px 18px;
+            font: inherit;
+            font-weight: 600;
+            color: #f8fafc;
+            background: rgba(15, 23, 42, 0.85);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            cursor: pointer;
+            z-index: 1000;
+            display: none;
+        }
+        .harness-back-btn:hover, .harness-back-btn:focus {
+            border-color: #60a5fa;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="harness-badge">Dev Harness</div>
+    <button id="harness-back-btn" class="harness-back-btn" type="button">&larr; Back to grid (Esc)</button>
+
+    <div class="launcher-container" id="launcher-container" style="display: flex">
+        <div class="header">
+            <h1>Game Test Harness</h1>
+            <p>Reads wwwroot/games.json &mdash; click a card or use arrow keys + Enter, same as the TV remote. Esc exits a running game.</p>
+        </div>
+
+        <div class="game-grid" id="game-grid">
+            <p>Loading games...</p>
+        </div>
+    </div>
+
+    <div id="game-container" style="display: none; width: 100vw; height: 100vh; overflow: hidden; background-color: #000; position: absolute; top: 0; left: 0;"></div>
+
+    <script src="js/phaser.min.js"></script>
+    <script src="js/launcher.js"></script>
+    <script>
+        (function() {
+            const launcherContainer = document.getElementById('launcher-container');
+            const gameGrid = document.getElementById('game-grid');
+            const backBtn = document.getElementById('harness-back-btn');
+            let isPlaying = false;
+
+            function renderGames(games) {
+                gameGrid.innerHTML = '';
+                games.forEach(game => {
+                    const card = document.createElement('div');
+                    card.tabIndex = 0;
+                    card.className = 'game-card';
+
+                    const thumb = document.createElement('div');
+                    thumb.className = 'game-thumb';
+
+                    if (game.thumbnail) {
+                        const img = document.createElement('img');
+                        img.src = game.thumbnail;
+                        img.alt = game.title;
+                        img.className = 'game-thumb-img';
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'thumb-placeholder';
+                        placeholder.textContent = game.title;
+                        placeholder.style.display = 'none';
+                        img.onerror = () => { img.style.display = 'none'; placeholder.style.display = 'flex'; };
+                        thumb.appendChild(img);
+                        thumb.appendChild(placeholder);
+                    } else {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'thumb-placeholder';
+                        placeholder.textContent = game.title;
+                        thumb.appendChild(placeholder);
+                    }
+
+                    const title = document.createElement('h2');
+                    title.textContent = game.title;
+
+                    card.appendChild(thumb);
+                    card.appendChild(title);
+                    card.addEventListener('click', () => launchGame(game.script));
+                    gameGrid.appendChild(card);
+                });
+            }
+
+            async function launchGame(scriptPath) {
+                isPlaying = true;
+                launcherContainer.style.display = 'none';
+                document.getElementById('game-container').style.display = 'block';
+                backBtn.style.display = 'block';
+
+                try {
+                    await window.appLauncher.loadGame(scriptPath);
+                } catch (err) {
+                    console.error('Error launching game:', err);
+                    exitGame();
+                }
+            }
+
+            function exitGame() {
+                window.appLauncher.exitGame();
+                isPlaying = false;
+                document.getElementById('game-container').style.display = 'none';
+                launcherContainer.style.display = 'flex';
+                backBtn.style.display = 'none';
+            }
+
+            backBtn.addEventListener('click', exitGame);
+
+            // Mirrors MainPage.BackButtonPressed in Components/Pages/Home.razor: give the
+            // active game a chance to handle Escape itself (e.g. open its pause menu)
+            // before falling back to exiting to the grid.
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Escape' || !isPlaying) return;
+                e.preventDefault();
+                const handledByGame = window.appLauncher.handleBackButton();
+                if (!handledByGame) exitGame();
+            });
+
+            window.appLauncher.fetchGames()
+                .then(json => {
+                    const games = JSON.parse(json);
+                    renderGames(games);
+                    window.appLauncher.initSpatialNavigation();
+                })
+                .catch(err => {
+                    gameGrid.innerHTML = '<p>Failed to load games.json: ' + err + '</p>';
+                });
+        })();
+    </script>
+
+</body>
+</html>
