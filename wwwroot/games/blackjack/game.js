@@ -376,7 +376,7 @@ window.launchGame = function(containerId) {
             this.statusText.setText('PLACE YOUR BET');
             this.updateScores();
             this.updateFinancials();
-            this.updateMenu(['+ $10', '+ $50', 'CLEAR', 'ALL IN', 'DEAL', 'MENU']);
+            this.updateMenu(['DEAL', '+ $10', '+ $50', 'CLEAR', 'ALL IN', 'MENU']);
         }
         
         updateFinancials() {
