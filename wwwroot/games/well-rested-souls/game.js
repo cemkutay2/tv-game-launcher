@@ -8,7 +8,8 @@ window.launchGame = function(containerId) {
         cabin: 0xfee440,
         upgrade: 0x00bbf9,
         traveler: 0xffd166,
-        text: 0xffffff
+        text: 0xffffff,
+        lockedNode: 0x4a4a5c
     };
 
     class MainScene extends Phaser.Scene {
@@ -39,6 +40,7 @@ window.launchGame = function(containerId) {
             this.tents = [];
             this.tier2Revealed = false;
             this.nextAITime = 0;
+            this.shootingStarLoopActive = false;
         }
 
         preload() {
@@ -51,6 +53,8 @@ window.launchGame = function(containerId) {
             this.createTriangleTexture('tent', 30, 0xffffff);
             this.createVignetteTexture('vignette');
             this.createTravelerTexture('traveler_orb');
+            this.createNebulaTexture('nebula', 1024);
+            this.createStreakTexture('streak', 120, 6);
         }
 
         createCircleTexture(key, radius, color, alpha=1) {
@@ -163,12 +167,80 @@ window.launchGame = function(containerId) {
             graphics.destroy();
         }
 
+        // White radial-gradient blob, tinted per-instance (like baseNode/tier2Node) so one
+        // texture can be reused for every colored nebula wash.
+        createNebulaTexture(key, size) {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+            gradient.addColorStop(0, 'rgba(255,255,255,0.35)');
+            gradient.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+
+            this.textures.addCanvas(key, canvas);
+        }
+
+        // Horizontal gradient strip (transparent -> opaque, left to right) used as a shooting
+        // star: anchored at its opaque right edge and rotated to face the direction of travel,
+        // so the transparent left end reads as a fading comet trail.
+        createStreakTexture(key, width, height) {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createLinearGradient(0, 0, width, 0);
+            gradient.addColorStop(0, 'rgba(255,255,255,0)');
+            gradient.addColorStop(1, 'rgba(255,255,255,1)');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+
+            this.textures.addCanvas(key, canvas);
+        }
+
         create() {
             // Gradient Sky - Made HUGE to support zooming out without cutting off edges
             const bg = this.add.graphics();
             bg.fillGradientStyle(COLORS.skyTop, COLORS.skyTop, COLORS.skyBottom, COLORS.skyBottom, 1);
             bg.fillRect(-5000, -5000, 12000, 12000);
             bg.setScrollFactor(0);
+
+            // Nebula glow — slow-drifting color washes behind the constellation, purely
+            // atmospheric. Placed around the outskirts of where nodes actually orbit
+            // (roughly radius 1500 from the dock) so they frame the map rather than
+            // sitting behind and competing with node visuals in the middle.
+            const nebulaSpots = [
+                { x: -700, y: -700, color: 0x9b5de5 }, // space branch purple
+                { x: 2900, y: 1200, color: 0x00d4ff }, // water branch cyan
+                { x: -400, y: 2400, color: 0xff006e }  // music branch magenta
+            ];
+            this.nebulae = nebulaSpots.map(spot => {
+                const n = this.add.image(spot.x, spot.y, 'nebula')
+                    .setTint(spot.color)
+                    .setScale(2.5 + Math.random())
+                    .setAlpha(0.5)
+                    .setBlendMode('ADD')
+                    .setScrollFactor(0.06);
+
+                this.tweens.add({
+                    targets: n,
+                    x: spot.x + Phaser.Math.Between(150, 300),
+                    y: spot.y + Phaser.Math.Between(-150, 150),
+                    duration: Phaser.Math.Between(25000, 40000),
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut'
+                });
+
+                return n;
+            });
 
             // Particles
             try {
@@ -201,9 +273,14 @@ window.launchGame = function(containerId) {
                     y: { min: -1000, max: 2000 },
                     lifespan: 30000,
                     speedX: { min: 5, max: 15 },
-                    alpha: { start: 0, end: 0.4, ease: 'Sine.easeInOut', yoyo: true }, // Lowered peak opacity slightly
+                    // `{ start, end, yoyo: true }` isn't a real EmitterOp form - yoyo is
+                    // ignored, so alpha eased up to 0.4 and just stayed there until the
+                    // particle died, making clouds pop out at full opacity instead of
+                    // fading. `values` keyframes through 0 -> 0.4 -> 0 across the particle's
+                    // full lifespan instead, so it fades back out before despawning.
+                    alpha: { values: [0, 0.4, 0], ease: 'Sine.easeInOut' },
                     scale: { min: 1, max: 4 },
-                    quantity: 2, 
+                    quantity: 2,
                     frequency: 1500 // Slower spawn rate
                 }).setScrollFactor(0.2);
             } catch (e) {
@@ -349,22 +426,34 @@ window.launchGame = function(containerId) {
             this.nodes.forEach(node => {
                 node.obj = this.add.container(node.x, node.y);
                 this.worldContainer.add(node.obj);
-                
+
                 const textureKey = node.parentId ? 'tier2Node' : 'baseNode';
-                
-                node.baseImage = this.add.image(0, 0, textureKey).setTint(node.color);
-                node.glow = this.add.image(0, 0, textureKey).setTint(node.color).setBlendMode('ADD').setScale(1.2).setAlpha(0.3);
-                
-                node.textObj = this.add.text(0, -110, node.label, { 
-                    font: '24px Arial', 
-                    fill: '#ffffff', 
+                const isLockedRest = node.type === 'rest' && !node.unlocked;
+
+                // Locked nodes render as flat, dormant grey (no glow pulse) instead of
+                // their branch color at low alpha, so "locked" reads clearly different
+                // from "unlocked but currently empty" at a glance.
+                node.baseImage = this.add.image(0, 0, textureKey).setTint(isLockedRest ? COLORS.lockedNode : node.color);
+                node.glow = this.add.image(0, 0, textureKey).setTint(isLockedRest ? COLORS.lockedNode : node.color).setBlendMode('ADD').setScale(1.2).setAlpha(0.3);
+
+                // Occupancy gauge: a ring around the node that fills up as it fills up,
+                // so you can tell which rest nodes have room without reading the [n/cap] text.
+                // Sized to sit clearly outside the selection cursor (radius 60/85, see
+                // updateSelection) rather than between the node's body/glow and the cursor,
+                // where there isn't enough clearance for a ring to read cleanly.
+                node.gaugeRadius = node.parentId ? 105 : 78;
+                node.occupancyGauge = this.add.graphics();
+
+                node.textObj = this.add.text(0, -110, node.label, {
+                    font: '24px Arial',
+                    fill: '#ffffff',
                     align: 'center',
                     stroke: '#000000',
                     strokeThickness: 4
                 }).setOrigin(0.5);
-                
-                node.obj.add([node.glow, node.baseImage, node.textObj]);
-                
+
+                node.obj.add([node.glow, node.baseImage, node.occupancyGauge, node.textObj]);
+
                 if (node.hidden) {
                     node.obj.setAlpha(0);
                     node.textObj.setAlpha(0);
@@ -372,17 +461,11 @@ window.launchGame = function(containerId) {
                     node.obj.setAlpha(0.2);
                 }
 
-                // Node pulsing glow
-                this.tweens.add({
-                    targets: node.glow,
-                    scaleX: 1.4,
-                    scaleY: 1.4,
-                    alpha: 0.1,
-                    duration: 1500 + Math.random() * 500,
-                    yoyo: true,
-                    repeat: -1,
-                    ease: 'Sine.easeInOut'
-                });
+                if (!isLockedRest) {
+                    this.startGlowPulse(node);
+                }
+
+                this.updateOccupancyGauge(node);
             });
 
             // Highlight cursor
@@ -565,6 +648,7 @@ window.launchGame = function(containerId) {
                                 if (n.unlocked) {
                                     n.obj.setAlpha(1);
                                     if (n.textObj) n.textObj.setAlpha(1);
+                                    this.unlockNodeVisuals(n);
                                 }
                             }
                         });
@@ -591,6 +675,12 @@ window.launchGame = function(containerId) {
                             }
                         });
                         this.drawConstellationLines();
+
+                        // The cursor was already drawn once (as a diamond) earlier in create(),
+                        // before tier2Revealed was known. Now that the dock has been swapped to
+                        // its pentagon shape, redraw the cursor so it matches immediately instead
+                        // of staying a stale diamond until the next time selection changes.
+                        this.updateSelection(true);
                     }
                 } catch (e) {
                     console.error('Error loading save:', e);
@@ -915,13 +1005,15 @@ window.launchGame = function(containerId) {
                     if (this.stardust >= node.unlockCost) {
                         this.stardust -= node.unlockCost;
                         node.unlocked = true;
-                        
+                        this.unlockNodeVisuals(node);
+                        this.celebrateUnlock(node);
+
                         this.tweens.add({
                             targets: node.obj,
                             alpha: 1,
                             duration: 1000
                         });
-                        
+
                         this.showFloatingText('Unlocked!', node.x, node.y - 50, node.color);
                         this.updateStardustText();
                         // Text will automatically update next frame via updateNodeLabels!
@@ -965,6 +1057,7 @@ window.launchGame = function(containerId) {
                         });
 
                         node.current.push(t);
+                        this.attachRestingZzz(t, node.x + ox, node.y + 50 + oy);
                     }
                     this.updateHeldText();
                 }
@@ -990,6 +1083,147 @@ window.launchGame = function(containerId) {
                 ease: 'Power2',
                 onComplete: () => t.destroy()
             });
+        }
+
+        // A small "z" that gently rises and fades over a resting traveler, so a glance at
+        // a rest node tells you "these souls are actually asleep" rather than just parked.
+        // Attached once at (x, y) - the traveler's settled position in the node - and lives
+        // until removeRestingZzz() is called when it checks out.
+        attachRestingZzz(t, x, y) {
+            const zzz = this.add.text(x, y - 40, 'z', {
+                font: '26px Arial',
+                fill: '#cfe8ff',
+                fontWeight: 'bold'
+            }).setOrigin(0.5).setAlpha(0.85);
+
+            this.worldContainer.add(zzz);
+            t.zzzText = zzz;
+
+            t.zzzTween = this.tweens.add({
+                targets: zzz,
+                y: y - 58,
+                alpha: 0.2,
+                duration: 1600,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
+
+        removeRestingZzz(t) {
+            if (t.zzzTween) {
+                t.zzzTween.stop();
+                t.zzzTween = null;
+            }
+            if (t.zzzText) {
+                t.zzzText.destroy();
+                t.zzzText = null;
+            }
+        }
+
+        startGlowPulse(node) {
+            if (node.glowTween) return; // already pulsing
+            node.glowTween = this.tweens.add({
+                targets: node.glow,
+                scaleX: 1.4,
+                scaleY: 1.4,
+                alpha: 0.1,
+                duration: 1500 + Math.random() * 500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
+
+        // Called whenever a node transitions from locked to unlocked (manual buy,
+        // auto-unlock, or restoring a save) to swap it from dormant grey back to
+        // its branch color and kick off the glow pulse.
+        unlockNodeVisuals(node) {
+            node.baseImage.setTint(node.color);
+            node.glow.setTint(node.color);
+            this.startGlowPulse(node);
+        }
+
+        // Expanding ring + radial particle burst for the moment a node actually gets
+        // unlocked (manual buy or AI auto-unlock only - NOT called from loadGame's restore
+        // path, since replaying every already-unlocked node's celebration on every load
+        // would be obnoxious). `intensity` scales the whole effect up for bigger moments
+        // like the Tier 2 reveal.
+        celebrateUnlock(node, options = {}) {
+            const intensity = options.intensity || 1;
+            const color = options.color !== undefined ? options.color : node.color;
+
+            const ring = this.add.graphics();
+            ring.setPosition(node.x, node.y);
+            this.worldContainer.add(ring);
+
+            const ringState = { radius: 20, alpha: 0.8 };
+            this.tweens.add({
+                targets: ringState,
+                radius: 160 * intensity,
+                alpha: 0,
+                duration: 650,
+                ease: 'Cubic.easeOut',
+                onUpdate: () => {
+                    ring.clear();
+                    ring.lineStyle(6, color, ringState.alpha);
+                    ring.strokeCircle(0, 0, ringState.radius);
+                },
+                onComplete: () => ring.destroy()
+            });
+
+            const burstCount = Math.round(10 * intensity);
+            for (let i = 0; i < burstCount; i++) {
+                const angle = (i / burstCount) * Math.PI * 2 + Math.random() * 0.3;
+                const dist = (90 + Math.random() * 50) * intensity;
+
+                const p = this.add.image(node.x, node.y, 'orb')
+                    .setTint(color)
+                    .setBlendMode('ADD')
+                    .setScale(0.8 * intensity);
+                this.worldContainer.add(p);
+
+                this.tweens.add({
+                    targets: p,
+                    x: node.x + Math.cos(angle) * dist,
+                    y: node.y + Math.sin(angle) * dist,
+                    alpha: 0,
+                    scale: 0.2 * intensity,
+                    duration: 550 + Math.random() * 150,
+                    ease: 'Cubic.easeOut',
+                    onComplete: () => p.destroy()
+                });
+            }
+        }
+
+        updateOccupancyGauge(node) {
+            const g = node.occupancyGauge;
+            if (!g) return;
+            g.clear();
+
+            // Nothing to show for hidden nodes or rest nodes still locked (no occupants possible).
+            if (node.hidden || (node.type === 'rest' && !node.unlocked)) return;
+            if (!node.capacity) return;
+
+            const radius = node.gaugeRadius;
+            const thickness = 8;
+            const fraction = Phaser.Math.Clamp(node.current.length / node.capacity, 0, 1);
+
+            // Empty track so you can see the gauge exists even at zero occupancy.
+            g.lineStyle(thickness, 0xffffff, 0.15);
+            g.strokeCircle(0, 0, radius);
+
+            if (fraction > 0) {
+                // Ramps to amber when full so a glance tells you both "how full" and "act now".
+                const color = fraction >= 0.999 ? 0xffaa33 : node.color;
+                const startAngle = -Math.PI / 2;
+                const endAngle = startAngle + Math.PI * 2 * fraction;
+
+                g.lineStyle(thickness, color, 0.30);
+                g.beginPath();
+                g.arc(0, 0, radius, startAngle, endAngle, false);
+                g.strokePath();
+            }
         }
 
         drawConstellationLines() {
@@ -1229,11 +1463,61 @@ window.launchGame = function(containerId) {
                     });
                 }
             });
+
+            if (!this.shootingStarLoopActive) {
+                this.shootingStarLoopActive = true;
+                this.time.delayedCall(2500, () => this.spawnShootingStar());
+            }
+        }
+
+        // Screen-space streak that fires periodically only while ambient mode is showing off
+        // the whole constellation; self-terminates (and clears the guard flag) as soon as
+        // isAmbient goes false, so it never keeps ticking during normal play.
+        spawnShootingStar() {
+            if (!this.isAmbient) {
+                this.shootingStarLoopActive = false;
+                return;
+            }
+
+            const fromLeft = Math.random() < 0.5;
+            const startX = fromLeft ? Phaser.Math.Between(-150, 300) : Phaser.Math.Between(1620, 2070);
+            const startY = Phaser.Math.Between(-50, 350);
+            const dx = fromLeft ? Phaser.Math.Between(600, 1000) : -Phaser.Math.Between(600, 1000);
+            const dy = Phaser.Math.Between(300, 500);
+            const angle = Math.atan2(dy, dx);
+
+            const star = this.add.image(startX, startY, 'streak')
+                .setOrigin(1, 0.5)
+                .setScrollFactor(0)
+                .setDepth(60)
+                .setBlendMode('ADD')
+                .setRotation(angle)
+                .setScale(0.9 + Math.random() * 0.5, 1)
+                .setAlpha(0);
+
+            this.tweens.add({
+                targets: star,
+                alpha: 1,
+                duration: 120,
+                onComplete: () => {
+                    this.tweens.add({
+                        targets: star,
+                        x: startX + dx,
+                        y: startY + dy,
+                        alpha: 0,
+                        duration: 650,
+                        ease: 'Cubic.easeIn',
+                        onComplete: () => star.destroy()
+                    });
+                }
+            });
+
+            this.time.delayedCall(Phaser.Math.Between(7000, 15000), () => this.spawnShootingStar());
         }
 
         exitAmbientMode() {
             this.isAmbient = false;
-            
+
             this.tweens.killTweensOf(this.cameras.main);
             this.tweens.killTweensOf([this.uiContainer, this.cursor, this.vignette]);
             this.nodes.forEach(node => {
@@ -1277,6 +1561,7 @@ window.launchGame = function(containerId) {
                     let baseName = node.label.split('\n')[0];
                     node.textObj.setText(`${baseName}\n[${node.current.length}/${node.capacity}]`);
                 }
+                this.updateOccupancyGauge(node);
             });
         }
 
@@ -1327,7 +1612,12 @@ window.launchGame = function(containerId) {
                 // Upgrade the Dock to handle the increased traffic
                 const dock = this.nodes[0];
                 dock.capacity = 12; // massive capacity boost
-                
+
+                // This is the biggest moment in the game, so the burst is bigger and
+                // gold-tinted to match the announcement text below, rather than reusing
+                // the dock's own (currently still teal) branch color.
+                this.celebrateUnlock(dock, { intensity: 2.2, color: 0xffd700 });
+
                 // Evolve the Dock's physical shape!
                 dock.baseImage.setTexture('tier2Node');
                 dock.glow.setTexture('tier2Node');
@@ -1445,9 +1735,29 @@ window.launchGame = function(containerId) {
                 
                 t.x += (targetX - t.x) * 0.05;
                 t.y += (targetY - t.y) * 0.05;
-                
+
                 t.scaleX = 1 + Math.sin(time / 150 + i) * 0.2;
                 t.scaleY = 1 + Math.cos(time / 150 + i) * 0.2;
+
+                // Throttled trailing glow so the "duckling follow" reads clearly, without
+                // spawning a fresh object every single frame for every follower.
+                if (!t.lastTrailTime || time - t.lastTrailTime > 90) {
+                    t.lastTrailTime = time;
+                    const trail = this.add.image(t.x, t.y, 'glow')
+                        .setScale(t.scaleX * 0.4)
+                        .setAlpha(0.35)
+                        .setTint(COLORS.traveler)
+                        .setBlendMode('ADD');
+                    this.worldContainer.add(trail);
+                    this.tweens.add({
+                        targets: trail,
+                        alpha: 0,
+                        scale: trail.scale * 1.8,
+                        duration: 500,
+                        ease: 'Sine.easeOut',
+                        onComplete: () => trail.destroy()
+                    });
+                }
             }
 
             // Regular Node Check-outs
@@ -1457,7 +1767,8 @@ window.launchGame = function(containerId) {
                         const t = node.current[i];
                         if (time > t.checkOutTime) {
                             node.current.splice(i, 1);
-                            
+                            this.removeRestingZzz(t);
+
                             this.stardust += 15; // Checkout Bonus
                             this.updateStardustText();
                             this.showFloatingText('+15 Check-out!', t.x, t.y - 30, COLORS.upgrade);
@@ -1526,12 +1837,9 @@ window.launchGame = function(containerId) {
                     
                     nodeToUnlock.unlocked = true;
                     nodeToUnlock.obj.setAlpha(1);
-                    
-                    this.tweens.add({
-                        targets: nodeToUnlock.glow,
-                        scaleX: 2, scaleY: 2, alpha: 0.8,
-                        duration: 500, yoyo: true
-                    });
+                    this.unlockNodeVisuals(nodeToUnlock);
+                    this.celebrateUnlock(nodeToUnlock);
+
                     this.showFloatingText('-' + nodeToUnlock.unlockCost + ' (Auto-Unlock)', nodeToUnlock.x, nodeToUnlock.y - 50, COLORS.upgrade);
                     
                     this.saveGame();
@@ -1549,12 +1857,13 @@ window.launchGame = function(containerId) {
                         
                         targetNode.current.push(t);
                         t.checkOutTime = time + Phaser.Math.Between(targetNode.dwellMin, targetNode.dwellMax);
-                        
+
                         const ox = Phaser.Math.Between(-80, 80);
                         const oy = Phaser.Math.Between(-15, 15);
-                        
+                        this.attachRestingZzz(t, targetNode.x + ox, targetNode.y + 50 + oy);
+
                         this.tweens.killTweensOf(t);
-                        
+
                         this.tweens.add({
                             targets: t,
                             x: targetNode.x + ox,
