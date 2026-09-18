@@ -28,5 +28,11 @@
     "title": "The Midnight Bellhop",
     "thumbnail": "games/midnight-bellhop/thumb.png",
     "script": "games/midnight-bellhop/game.js"
+  },
+  {
+    "id": "maze-chomper",
+    "title": "Maze Chomper",
+    "thumbnail": "games/maze-chomper/thumb.png",
+    "script": "games/maze-chomper/game.js"
   }
 ]
