@@ -1,4 +1,29 @@
 window.launchGame = function(containerId) {
+    // Self-hosted webfont (Fredoka) instead of the default Arial, for a softer/rounder
+    // look that fits the game's cozy theme. Injected once per page load - guarded by id
+    // since the launcher can call launchGame() again without a full page reload.
+    if (!document.getElementById('wrs-font-face')) {
+        const style = document.createElement('style');
+        style.id = 'wrs-font-face';
+        style.textContent = `
+            @font-face {
+                font-family: 'Fredoka';
+                font-style: normal;
+                font-weight: 500;
+                font-display: swap;
+                src: url('games/well-rested-souls/fredoka-500.woff2') format('woff2');
+            }
+            @font-face {
+                font-family: 'Fredoka';
+                font-style: normal;
+                font-weight: 700;
+                font-display: swap;
+                src: url('games/well-rested-souls/fredoka-700.woff2') format('woff2');
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     const COLORS = {
         skyTop: 0x0f0c29,
         skyMiddle: 0x302b63,
@@ -41,6 +66,7 @@ window.launchGame = function(containerId) {
             this.tier2Revealed = false;
             this.nextAITime = 0;
             this.shootingStarLoopActive = false;
+            this.sceneReady = false;
         }
 
         preload() {
@@ -206,6 +232,21 @@ window.launchGame = function(containerId) {
         }
 
         create() {
+            // Canvas text needs the webfont already loaded before it's first drawn, or
+            // Phaser renders it in the browser's fallback font and never re-draws it once
+            // the real font arrives. Gate the actual scene build behind the two weights
+            // this game uses, with a timeout so a slow/offline font fetch can't hang the
+            // game forever - it just starts with the fallback font in that case.
+            const fontsReady = Promise.all([
+                document.fonts.load('500 32px "Fredoka"'),
+                document.fonts.load('700 32px "Fredoka"')
+            ]).catch(() => {});
+            const timeout = new Promise(resolve => setTimeout(resolve, 1500));
+
+            Promise.race([fontsReady, timeout]).then(() => this.buildScene());
+        }
+
+        buildScene() {
             // Gradient Sky - Made HUGE to support zooming out without cutting off edges
             const bg = this.add.graphics();
             bg.fillGradientStyle(COLORS.skyTop, COLORS.skyTop, COLORS.skyBottom, COLORS.skyBottom, 1);
@@ -445,7 +486,7 @@ window.launchGame = function(containerId) {
                 node.occupancyGauge = this.add.graphics();
 
                 node.textObj = this.add.text(0, -110, node.label, {
-                    font: '24px Arial',
+                    font: '24px Fredoka',
                     fill: '#ffffff',
                     align: 'center',
                     stroke: '#000000',
@@ -494,7 +535,7 @@ window.launchGame = function(containerId) {
             this.uiContainer = this.add.container(1920/2, 1080/2).setScrollFactor(0).setAlpha(0);
             
             this.stardustText = this.add.text(0, 60 - 1080/2, 'Stardust: 0', { 
-                font: '56px Arial', 
+                font: '56px Fredoka', 
                 fill: '#ffffff', 
                 fontWeight: 'bold',
                 stroke: '#9b5de5',
@@ -503,14 +544,14 @@ window.launchGame = function(containerId) {
             }).setOrigin(0.5);
             
             this.heldText = this.add.text(0, 140 - 1080/2, '', {
-                font: '36px Arial',
+                font: '36px Fredoka',
                 fill: '#00f5d4',
                 fontWeight: 'bold',
                 shadow: { offsetX: 0, offsetY: 2, color: '#000000', blur: 4, stroke: true, fill: true }
             }).setOrigin(0.5);
 
             this.statusText = this.add.text(0, 1000 - 1080/2, 'D-Pad: Orbit Constellation | Point Inward: Snap to Dock | Enter: Interact & Unlock', {
-                font: '28px Arial',
+                font: '28px Fredoka',
                 fill: '#ffffff',
                 alpha: 0.6
             }).setOrigin(0.5);
@@ -522,7 +563,7 @@ window.launchGame = function(containerId) {
             this.menuContainer = this.add.container(1920/2, 1080/2).setScrollFactor(0);
             
             this.title = this.add.text(0, -150, 'Well-Rested Souls', {
-                font: '120px Arial',
+                font: '120px Fredoka',
                 fill: '#ffffff',
                 fontWeight: 'bold',
                 stroke: '#9b5de5',
@@ -538,7 +579,7 @@ window.launchGame = function(containerId) {
             ]);
             
             this.exitText = this.add.text(0, 300, 'Press Back/ESC to exit app', {
-                font: '24px Arial',
+                font: '24px Fredoka',
                 fill: '#ffffff',
                 alpha: 0.6
             }).setOrigin(0.5);
@@ -573,6 +614,8 @@ window.launchGame = function(containerId) {
 
             this.loadGame();
             this.spawnTraveler();
+
+            this.sceneReady = true;
         }
 
         updateMenuOptions(options) {
@@ -585,7 +628,7 @@ window.launchGame = function(containerId) {
             
             this.menuOptions.forEach((opt, i) => {
                 const text = this.add.text(0, 30 + i * 90, opt.text, {
-                    font: '54px Arial',
+                    font: '54px Fredoka',
                     fill: i === 0 ? '#00f5d4' : '#ffffff',
                     fontWeight: 'bold',
                     stroke: '#000000',
@@ -598,7 +641,7 @@ window.launchGame = function(containerId) {
             
             if (this.menuCursorText) this.menuCursorText.destroy();
             this.menuCursorText = this.add.text(0, 30, '>                                   <', {
-                font: '54px Arial',
+                font: '54px Fredoka',
                 fill: '#00f5d4',
                 fontWeight: 'bold'
             }).setOrigin(0.5);
@@ -1066,7 +1109,7 @@ window.launchGame = function(containerId) {
 
         showFloatingText(msg, x, y, color) {
             const t = this.add.text(x, y, msg, {
-                font: '32px Arial',
+                font: '32px Fredoka',
                 fill: '#ffffff',
                 fontWeight: 'bold',
                 stroke: '#000000',
@@ -1091,7 +1134,7 @@ window.launchGame = function(containerId) {
         // until removeRestingZzz() is called when it checks out.
         attachRestingZzz(t, x, y) {
             const zzz = this.add.text(x, y - 40, 'z', {
-                font: '26px Arial',
+                font: '26px Fredoka',
                 fill: '#cfe8ff',
                 fontWeight: 'bold'
             }).setOrigin(0.5).setAlpha(0.85);
@@ -1566,6 +1609,11 @@ window.launchGame = function(containerId) {
         }
 
         update(time, delta) {
+            // buildScene() runs asynchronously (it waits on the webfont load first), so
+            // Phaser can start calling update() on frames before it's actually populated
+            // this.nodes/cursor/uiContainer/etc. Bail out until it's finished.
+            if (!this.sceneReady) return;
+
             if (this.gameState === 'menu' || this.gameState === 'pause') {
                 const timeDiff = delta;
                 
@@ -1684,7 +1732,7 @@ window.launchGame = function(containerId) {
                 
                 // Show a big notification in the center of the screen
                 const announcement = this.add.text(1920/2, 1080/2 - 300, 'Constellation Expanding!', {
-                    font: '48px Arial',
+                    font: '48px Fredoka',
                     fill: '#ffd700',
                     fontWeight: 'bold',
                     stroke: '#000000',
@@ -1900,7 +1948,7 @@ window.launchGame = function(containerId) {
     // or dismissed ambient mode), false to let the launcher exit to the grid.
     game.handleBackButton = function() {
         const scene = game.scene.getScene('MainScene');
-        if (!scene) return false;
+        if (!scene || !scene.sceneReady) return false;
 
         if (scene.gameState === 'menu') return false; // let launcher exit to grid
 
